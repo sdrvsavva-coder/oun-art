@@ -23,8 +23,8 @@
         .social-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-size: 0.9rem; }
         .social-links a { color: #6b5a48; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 
-        .auth-modal, .admin-panel { background: white; border-radius: 28px; padding: 24px; margin: 20px 0; border: 2px solid #e7d9ce; display: none; }
-        .auth-modal.active, .admin-panel.active { display: block; }
+        .admin-panel { background: white; border-radius: 28px; padding: 24px; margin: 20px 0; border: 2px solid #e7d9ce; display: none; }
+        .admin-panel.active { display: block; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .admin-title { font-size: 1.5rem; font-weight: 700; color: #9c6e42; }
         .admin-form { display: flex; flex-direction: column; gap: 16px; background: #f9f5ef; padding: 20px; border-radius: 20px; }
@@ -52,10 +52,12 @@
         .edit-fields { display: none; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eedbcb; }
         .edit-fields input, .edit-fields textarea { padding: 8px; border-radius: 12px; border: 1px solid #e2cfbf; }
 
-        .auth-content { background: white; border-radius: 32px; padding: 32px; max-width: 400px; margin: 0 auto; text-align: center; }
-        .auth-content input { width: 100%; padding: 12px; border-radius: 16px; border: 1px solid #e2cfbf; margin: 12px 0; }
-        .auth-content button { background: #9c6e42; color: white; border: none; padding: 12px; border-radius: 40px; width: 100%; cursor: pointer; }
-        .auth-error { color: red; margin-top: 8px; display: none; }
+        .password-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
+        .password-modal.active { display: flex; }
+        .password-content { background: white; border-radius: 32px; padding: 32px; max-width: 400px; width: 90%; text-align: center; }
+        .password-content input { width: 100%; padding: 12px; border-radius: 16px; border: 1px solid #e2cfbf; margin: 16px 0; }
+        .password-content button { background: #9c6e42; color: white; border: none; padding: 12px; border-radius: 40px; width: 100%; cursor: pointer; }
+        .password-error { color: red; margin-top: 8px; display: none; }
 
         .section-title { font-size: 2rem; font-weight: 600; margin: 40px 0 24px; border-left: 6px solid #c6a27a; padding-left: 20px; }
         .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 30px; margin-bottom: 60px; }
@@ -161,13 +163,12 @@
     </div>
 </div>
 
-<div id="authModal" class="auth-modal">
-    <div class="auth-content">
+<div id="passwordModal" class="password-modal">
+    <div class="password-content">
         <h3>🔐 Вход в админ-панель</h3>
-        <input type="email" id="loginEmail" placeholder="Email" value="admin@ounart.ru">
-        <input type="password" id="loginPassword" placeholder="Пароль">
-        <button id="loginBtn">Войти</button>
-        <div id="authError" class="auth-error">Неверный email или пароль</div>
+        <input type="password" id="adminPassword" placeholder="Пароль">
+        <button id="submitPasswordBtn">Войти</button>
+        <div id="passwordError" class="password-error">Неверный пароль</div>
     </div>
 </div>
 <div id="toastMsg" class="toast"></div>
@@ -175,68 +176,49 @@
 <script>
     const SUPABASE_URL = "https://sdjhyyrichtibizvaw.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_RvP8dcS4yt6iAafJYzib8w_NPDqWpfB";
+    const ADMIN_PASSWORD = "classmate@$^";
     const TELEGRAM_BOT_TOKEN = "8639109854:AAGfLAsx8p9hCsewCBUBA4vRYLXIhF-2VYM";
     const TELEGRAM_CHAT_ID = "1640384547";
     
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     
     let products = [];
     let cart = [];
     let isAdmin = false;
     let currentImageFiles = [];
 
-    // ========== АУТЕНТИФИКАЦИЯ ==========
-    async function login(email, password) {
-        try {
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) throw error;
+    // ========== АДМИН ПАРОЛЬ ==========
+    function checkAdmin() {
+        if (sessionStorage.getItem("admin_logged") === "true") {
             isAdmin = true;
-            sessionStorage.setItem("admin_session", "true");
-            document.getElementById("authModal").classList.remove("active");
             document.getElementById("adminPanel").classList.add("active");
-            await loadProducts();
+        }
+    }
+    
+    function showPasswordModal() {
+        document.getElementById("passwordModal").classList.add("active");
+        document.getElementById("adminPassword").value = "";
+        document.getElementById("passwordError").style.display = "none";
+    }
+    
+    function loginAdmin(password) {
+        if (password === ADMIN_PASSWORD) {
+            isAdmin = true;
+            sessionStorage.setItem("admin_logged", "true");
+            document.getElementById("passwordModal").classList.remove("active");
+            document.getElementById("adminPanel").classList.add("active");
             renderAdminList();
             showToast("Добро пожаловать!");
-        } catch (error) {
-            document.getElementById("authError").style.display = "block";
+        } else {
+            document.getElementById("passwordError").style.display = "block";
         }
     }
-
-    async function logout() {
-        await supabaseClient.auth.signOut();
+    
+    function logoutAdmin() {
         isAdmin = false;
-        sessionStorage.removeItem("admin_session");
+        sessionStorage.removeItem("admin_logged");
         document.getElementById("adminPanel").classList.remove("active");
         showToast("Вы вышли");
-    }
-
-    async function checkSession() {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (session) {
-            isAdmin = true;
-            sessionStorage.setItem("admin_session", "true");
-            document.getElementById("adminPanel").classList.add("active");
-            await loadProducts();
-            renderAdminList();
-        }
-    }
-
-    // ========== ОТПРАВКА ЗАКАЗА В TELEGRAM ==========
-    async function sendOrderToTelegram(orderData) {
-        const message = `🛍 НОВЫЙ ЗАКАЗ!\n\n👤 Имя: ${orderData.name}\n📧 Email: ${orderData.email}\n📞 Телефон: ${orderData.phone}\n💬 Telegram: ${orderData.telegram}\n\n📦 Товары:\n${orderData.items}\n\n💰 Сумма: ${orderData.total}`;
-        
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message })
-            });
-            return response.ok;
-        } catch (error) {
-            console.error("Ошибка отправки в Telegram:", error);
-            return false;
-        }
     }
 
     // ========== ТОВАРЫ ==========
@@ -244,7 +226,7 @@
         const grid = document.getElementById("productsGrid");
         grid.innerHTML = '<div class="loading">Загрузка...</div>';
         try {
-            const { data, error } = await supabaseClient.from('products').select('*').order('id', { ascending: true });
+            const { data, error } = await supabase.from('products').select('*').order('id', { ascending: true });
             if (error) throw error;
             products = data || [];
             renderProducts();
@@ -262,7 +244,7 @@
         const avito = document.getElementById("productAvitoLink").value.trim();
         if (!name || !desc) { showToast("Заполните название и описание"); return; }
         try {
-            await supabaseClient.from('products').insert([{ name, description: desc, price, avito_link: avito || null, images: currentImageFiles }]);
+            await supabase.from('products').insert([{ name, description: desc, price, avito_link: avito || null, images: currentImageFiles }]);
             showToast("✅ Товар добавлен");
             document.getElementById("productName").value = "";
             document.getElementById("productDesc").value = "";
@@ -277,7 +259,7 @@
     async function deleteProduct(id) {
         if (!confirm("Удалить товар?")) return;
         try {
-            await supabaseClient.from('products').delete().eq('id', id);
+            await supabase.from('products').delete().eq('id', id);
             showToast("✅ Удалено");
             await loadProducts();
         } catch(e) { showToast("❌ Ошибка удаления"); }
@@ -285,7 +267,7 @@
 
     async function updateProduct(id, name, desc, price, avito, images) {
         try {
-            await supabaseClient.from('products').update({ name, description: desc, price, avito_link: avito, images }).eq('id', id);
+            await supabase.from('products').update({ name, description: desc, price, avito_link: avito, images }).eq('id', id);
             showToast("✅ Обновлено");
             await loadProducts();
         } catch(e) { showToast("❌ Ошибка обновления"); }
@@ -359,6 +341,22 @@
             const id = parseInt(btn.dataset.id);
             document.getElementById(`edit-fields-${id}`).style.display = "none";
         }));
+    }
+
+    // ========== ОТПРАВКА ЗАКАЗА ==========
+    async function sendOrderToTelegram(orderData) {
+        const message = `🛍 НОВЫЙ ЗАКАЗ!\n\n👤 Имя: ${orderData.name}\n📧 Email: ${orderData.email}\n📞 Телефон: ${orderData.phone}\n💬 Telegram: ${orderData.telegram}\n\n📦 Товары:\n${orderData.items}\n\n💰 Сумма: ${orderData.total}`;
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message })
+            });
+            return response.ok;
+        } catch (error) {
+            return false;
+        }
     }
 
     // ========== КОРЗИНА ==========
@@ -469,16 +467,16 @@
             document.getElementById("adminPanel").classList.toggle("active");
             if (document.getElementById("adminPanel").classList.contains("active")) renderAdminList();
         } else {
-            document.getElementById("authModal").classList.add("active");
-            document.getElementById("authError").style.display = "none";
+            showPasswordModal();
         }
     });
-    document.getElementById("loginBtn")?.addEventListener("click", () => {
-        const email = document.getElementById("loginEmail").value;
-        const password = document.getElementById("loginPassword").value;
-        login(email, password);
+    document.getElementById("submitPasswordBtn")?.addEventListener("click", () => {
+        loginAdmin(document.getElementById("adminPassword").value);
     });
-    document.getElementById("logoutAdminBtn")?.addEventListener("click", logout);
+    document.getElementById("adminPassword")?.addEventListener("keypress", e => {
+        if (e.key === "Enter") loginAdmin(e.target.value);
+    });
+    document.getElementById("logoutAdminBtn")?.addEventListener("click", logoutAdmin);
     document.getElementById("cartIconBtn")?.addEventListener("click", () => { renderCart(); document.getElementById("cartModal").classList.add("active"); });
     document.getElementById("closeCartBtn")?.addEventListener("click", () => document.getElementById("cartModal").classList.remove("active"));
     document.getElementById("clearCartBtn")?.addEventListener("click", clearCart);
@@ -488,7 +486,7 @@
     function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
     function showToast(m) { const t = document.getElementById("toastMsg"); t.innerText = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000); }
 
-    checkSession();
+    checkAdmin();
     loadProducts();
     const savedCart = localStorage.getItem("oun_cart");
     if (savedCart) try { cart = JSON.parse(savedCart); updateCartCounter(); } catch(e) {}
