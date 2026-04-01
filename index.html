@@ -132,13 +132,13 @@
             </div>
             <div class="admin-buttons-row">
                 <button id="addProductBtn">➕ Добавить товар</button>
-                <button id="saveProductsBtn" class="secondary">💾 Сохранить все товары</button>
+                <button id="saveProductsBtn" class="secondary">💾 Сохранить в Google Таблицу</button>
                 <button id="resetFormBtn" class="secondary">🗑️ Сбросить</button>
             </div>
         </div>
         <div class="products-admin-list" id="adminProductsList"></div>
         <p style="font-size:0.7rem; margin-top:12px; color:#b29272;">
-            После добавления/изменения товаров нажмите «Сохранить все товары» — изменения сразу увидят все покупатели!
+            После добавления/изменения товаров нажмите «Сохранить в Google Таблицу».
         </p>
     </div>
 
@@ -176,59 +176,107 @@
 <div id="toastMsg" class="toast"></div>
 
 <script>
-    // ========== НАСТРОЙКА ==========
     const ADMIN_PASSWORD = "classmate@$^";
     const TELEGRAM_BOT_TOKEN = "8639109854:AAGfLAsx8p9hCsewCBUBA4vRYLXIhF-2VYM";
     const TELEGRAM_CHAT_ID = "1640384547";
     const DEFAULT_AVITO = "https://www.avito.ru/brands/eb053d7096bb77164298b6f7e5f935a5?src=sharing";
     
-    // ВАШ URL ВЕБ-ПРИЛОЖЕНИЯ
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyBflo9Z8xTaf8tfIxWbr-Tkg_ZGnYu1aMR-r7B4qz2nsHkcZAW-RAkNX1bcycTabG1/exec";
+    // Google Sheets CSV URL (только для чтения)
+    const GOOGLE_SHEET_ID = "1tn96B4WQqDNsGL57MBLXUjBlJ-CyYvbBlDnYOQNVdAo";
+    const CSV_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv`;
     
     let products = [];
     let cart = [];
     let isAdmin = false;
     let currentImageFiles = [];
 
-    // ========== ЗАГРУЗКА ТОВАРОВ ==========
+    // ========== ЗАГРУЗКА ТОВАРОВ ИЗ GOOGLE SHEETS ==========
     async function loadProducts() {
         const grid = document.getElementById("productsGrid");
         grid.innerHTML = '<div class="loading">Загрузка товаров...</div>';
         try {
-            const response = await fetch(GOOGLE_SCRIPT_URL);
-            products = await response.json();
+            const response = await fetch(CSV_URL);
+            const csvText = await response.text();
+            const rows = csvText.split('\n').filter(row => row.trim());
+            if (rows.length < 2) {
+                grid.innerHTML = '<div class="loading">Нет товаров. Добавьте их в админ-панели</div>';
+                return;
+            }
+            
+            const headers = parseCSVRow(rows[0]).map(h => h.replace(/["']/g, '').trim().toLowerCase());
+            const colId = headers.findIndex(h => h === 'id');
+            const colName = headers.findIndex(h => h === 'название');
+            const colDesc = headers.findIndex(h => h === 'описание');
+            const colPrice = headers.findIndex(h => h === 'цена');
+            const colAvito = headers.findIndex(h => h === 'авито_ссылка');
+            const colPhoto = headers.findIndex(h => h === 'фото');
+            
+            const newProducts = [];
+            for (let i = 1; i < rows.length; i++) {
+                const values = parseCSVRow(rows[i]);
+                if (!values[colId] || values[colId] === 'id') continue;
+                
+                let images = [];
+                if (colPhoto !== -1 && values[colPhoto]) {
+                    try {
+                        images = JSON.parse(values[colPhoto].replace(/""/g, '"'));
+                    } catch(e) {}
+                }
+                
+                newProducts.push({
+                    id: parseInt(values[colId]) || i,
+                    name: colName !== -1 ? (values[colName]?.replace(/["']/g, '').trim() || "Товар") : "Товар",
+                    description: colDesc !== -1 ? (values[colDesc]?.replace(/["']/g, '').trim() || "") : "",
+                    price: colPrice !== -1 ? (values[colPrice]?.replace(/["']/g, '').trim() || "Цена не указана") : "Цена не указана",
+                    avito_link: colAvito !== -1 ? (values[colAvito]?.replace(/["']/g, '').trim() || "") : "",
+                    images: images
+                });
+            }
+            
+            products = newProducts;
             renderProducts();
             if (isAdmin) renderAdminList();
         } catch(e) {
             console.error(e);
-            grid.innerHTML = '<div class="loading">❌ Ошибка загрузки. Проверьте настройки</div>';
+            grid.innerHTML = '<div class="loading">❌ Ошибка загрузки. Проверьте публикацию таблицы</div>';
         }
     }
 
-    // ========== СОХРАНЕНИЕ ТОВАРОВ ==========
-    async function saveProducts() {
+    function parseCSVRow(row) {
+        const result = [];
+        let inQuotes = false;
+        let current = '';
+        for (let i = 0; i < row.length; i++) {
+            const c = row[i];
+            if (c === '"') { inQuotes = !inQuotes; }
+            else if (c === ',' && !inQuotes) { result.push(current); current = ''; }
+            else { current += c; }
+        }
+        result.push(current);
+        return result;
+    }
+
+    // ========== СОХРАНЕНИЕ В GOOGLE SHEETS (через ссылку-подсказку) ==========
+    function saveToGoogleSheets() {
         if (!products.length) { showToast("Нет товаров для сохранения"); return; }
-        showToast("💾 Сохранение...");
-        try {
-            const response = await fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'save', products: products })
-            });
-            const result = await response.json();
-            if (result.success) {
-                showToast("✅ Товары сохранены! Все покупатели увидят изменения");
-                await loadProducts();
-            } else {
-                showToast("❌ Ошибка сохранения");
-            }
-        } catch(e) {
-            console.error(e);
-            showToast("❌ Ошибка сохранения");
-        }
+        
+        // Формируем данные для копирования
+        let csvContent = "id,название,описание,цена,авито_ссылка,фото\n";
+        products.forEach(p => {
+            const imagesJson = JSON.stringify(p.images || []).replace(/"/g, '""');
+            csvContent += `${p.id},"${p.name}","${p.description}","${p.price}","${p.avito_link || ""}","${imagesJson}"\n`;
+        });
+        
+        // Копируем в буфер обмена
+        navigator.clipboard.writeText(csvContent).then(() => {
+            showToast("✅ Данные скопированы! Откройте Google Таблицу и вставьте в первую ячейку (A1)");
+            window.open(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/edit`, "_blank");
+        }).catch(() => {
+            showToast("❌ Не удалось скопировать");
+        });
     }
 
-    // ========== ДОБАВЛЕНИЕ ТОВАРА ==========
+    // ========== АДМИН ПАНЕЛЬ ==========
     function addProduct() {
         const name = document.getElementById("productName").value.trim();
         const desc = document.getElementById("productDesc").value.trim();
@@ -253,15 +301,16 @@
         document.getElementById("imagePreviews").innerHTML = "";
         currentImageFiles = [];
         renderAdminList();
-        showToast("✅ Товар добавлен. Нажмите «Сохранить все товары»");
+        renderProducts();
+        showToast("✅ Товар добавлен. Нажмите «Сохранить в Google Таблицу»");
     }
 
-    // ========== РЕДАКТИРОВАНИЕ/УДАЛЕНИЕ ==========
     function deleteProduct(id) {
         if (!confirm("Удалить товар?")) return;
         products = products.filter(p => p.id !== id);
         renderAdminList();
-        showToast("✅ Товар удален. Нажмите «Сохранить все товары»");
+        renderProducts();
+        showToast("✅ Товар удален. Нажмите «Сохранить в Google Таблицу»");
     }
 
     function updateProduct(id, name, desc, price, avito, images) {
@@ -269,7 +318,8 @@
         if (index === -1) return;
         products[index] = { ...products[index], name, description: desc, price, avito_link: avito, images };
         renderAdminList();
-        showToast("✅ Товар обновлен. Нажмите «Сохранить все товары»");
+        renderProducts();
+        showToast("✅ Товар обновлен. Нажмите «Сохранить в Google Таблицу»");
     }
 
     function renderProducts() {
@@ -471,7 +521,7 @@
 
     // ========== ОБРАБОТЧИКИ ==========
     document.getElementById("addProductBtn")?.addEventListener("click", addProduct);
-    document.getElementById("saveProductsBtn")?.addEventListener("click", saveProducts);
+    document.getElementById("saveProductsBtn")?.addEventListener("click", saveToGoogleSheets);
     document.getElementById("resetFormBtn")?.addEventListener("click", () => {
         document.getElementById("productName").value = "";
         document.getElementById("productDesc").value = "";
@@ -501,7 +551,6 @@
     function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
     function showToast(m) { const t = document.getElementById("toastMsg"); t.innerText = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000); }
 
-    // Проверка сессии
     if (sessionStorage.getItem("admin_logged") === "true") {
         isAdmin = true;
         document.getElementById("adminPanel").classList.add("active");
