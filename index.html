@@ -184,23 +184,21 @@
     const TELEGRAM_CHAT_ID = "1640384547";
     const DEFAULT_AVITO = "https://www.avito.ru/brands/eb053d7096bb77164298b6f7e5f935a5?src=sharing";
     
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     
     let products = [];
     let cart = [];
     let isAdmin = false;
     let currentImageFiles = [];
 
-    // ========== ЗАГРУЗКА ТОВАРОВ ==========
     async function loadProducts() {
         const grid = document.getElementById("productsGrid");
         grid.innerHTML = '<div class="loading">Загрузка...</div>';
         try {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('products')
                 .select('*')
                 .order('id', { ascending: true });
-            
             if (error) throw error;
             products = data || [];
             renderProducts();
@@ -211,25 +209,19 @@
         }
     }
 
-    // ========== СОХРАНЕНИЕ ТОВАРОВ ==========
     async function saveProductsToSupabase() {
         if (!products.length) { showToast("Нет товаров для сохранения"); return; }
         showToast("💾 Сохранение...");
-        
         try {
-            // Сначала удаляем все старые товары
-            const { error: deleteError } = await supabase
+            const { error: deleteError } = await supabaseClient
                 .from('products')
                 .delete()
                 .neq('id', 0);
-            
             if (deleteError) throw deleteError;
             
-            // Затем добавляем новые
-            const { error: insertError } = await supabase
+            const { error: insertError } = await supabaseClient
                 .from('products')
                 .insert(products);
-            
             if (insertError) throw insertError;
             
             showToast("✅ Товары сохранены!");
@@ -240,7 +232,6 @@
         }
     }
 
-    // ========== ДОБАВЛЕНИЕ ТОВАРА ==========
     function addProduct() {
         const name = document.getElementById("productName").value.trim();
         const desc = document.getElementById("productDesc").value.trim();
@@ -289,7 +280,6 @@
     function renderProducts() {
         const grid = document.getElementById("productsGrid");
         if (!products.length) { grid.innerHTML = '<div class="loading">Нет товаров. Добавьте их в админ-панели</div>'; return; }
-        
         grid.innerHTML = products.map(p => {
             const mainImg = p.images?.[0] || null;
             const avitoLink = p.avito_link || DEFAULT_AVITO;
@@ -308,7 +298,6 @@
                 </div>
             `;
         }).join('');
-        
         document.querySelectorAll(".cart-btn").forEach(btn => btn.addEventListener("click", e => addToCart(parseInt(btn.dataset.id))));
     }
 
@@ -356,7 +345,6 @@
         }));
     }
 
-    // ========== КОРЗИНА ==========
     async function sendOrderToTelegram(orderData) {
         const message = `🛍 НОВЫЙ ЗАКАЗ!\n\n👤 Имя: ${orderData.name}\n📧 Email: ${orderData.email}\n📞 Телефон: ${orderData.phone}\n💬 Telegram: ${orderData.telegram}\n\n📦 Товары:\n${orderData.items}\n\n💰 Сумма: ${orderData.total}`;
         const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -443,7 +431,6 @@
         }
     }
 
-    // ========== ФОТО ==========
     document.getElementById("productImages")?.addEventListener("change", e => {
         const pv = document.getElementById("imagePreviews");
         pv.innerHTML = "";
@@ -462,7 +449,18 @@
         });
     });
 
-    // ========== АДМИН ПАРОЛЬ ==========
+    document.getElementById("addProductBtn")?.addEventListener("click", addProduct);
+    document.getElementById("saveProductsBtn")?.addEventListener("click", saveProductsToSupabase);
+    document.getElementById("resetFormBtn")?.addEventListener("click", () => {
+        document.getElementById("productName").value = "";
+        document.getElementById("productDesc").value = "";
+        document.getElementById("productPrice").value = "";
+        document.getElementById("productAvitoLink").value = "";
+        document.getElementById("imagePreviews").innerHTML = "";
+        currentImageFiles = [];
+        showToast("🧹 Форма очищена");
+    });
+
     function showPasswordModal() { document.getElementById("passwordModal").classList.add("active"); document.getElementById("adminPassword").value = ""; document.getElementById("passwordError").style.display = "none"; }
     function loginAdmin(pw) {
         if (pw === ADMIN_PASSWORD) {
@@ -483,18 +481,6 @@
         showToast("Вы вышли");
     }
 
-    // ========== ОБРАБОТЧИКИ ==========
-    document.getElementById("addProductBtn")?.addEventListener("click", addProduct);
-    document.getElementById("saveProductsBtn")?.addEventListener("click", saveProductsToSupabase);
-    document.getElementById("resetFormBtn")?.addEventListener("click", () => {
-        document.getElementById("productName").value = "";
-        document.getElementById("productDesc").value = "";
-        document.getElementById("productPrice").value = "";
-        document.getElementById("productAvitoLink").value = "";
-        document.getElementById("imagePreviews").innerHTML = "";
-        currentImageFiles = [];
-        showToast("🧹 Форма очищена");
-    });
     document.getElementById("adminToggleBtn")?.addEventListener("click", () => {
         if (isAdmin) {
             document.getElementById("adminPanel").classList.toggle("active");
