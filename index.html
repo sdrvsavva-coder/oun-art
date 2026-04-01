@@ -55,6 +55,11 @@
         .delete-btn { background: #f0cfc3; }
         .edit-fields { display: none; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eedbcb; }
         .edit-fields input, .edit-fields textarea { padding: 8px; border-radius: 12px; border: 1px solid #e2cfbf; }
+        .edit-photos { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+        .edit-photos img { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; }
+        .edit-image-upload { margin-top: 8px; }
+        .edit-image-upload .image-upload-label { background: #9c6e42; color: white; padding: 6px 12px; border-radius: 20px; cursor: pointer; display: inline-block; font-size: 0.8rem; }
+        .edit-previews { display: flex; flex-direction: row; gap: 10px; margin-top: 8px; overflow-x: auto; }
 
         .password-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
         .password-modal.active { display: flex; }
@@ -214,7 +219,6 @@
     let currentLightboxImages = [];
     let currentLightboxIndex = 0;
 
-    // ========== ЗАГРУЗКА ТОВАРОВ ==========
     async function loadProducts() {
         const grid = document.getElementById("productsGrid");
         grid.innerHTML = '<div class="loading">Загрузка товаров...</div>';
@@ -230,7 +234,6 @@
         }
     }
 
-    // ========== ЭКСПОРТ ==========
     function exportProducts() {
         if (!products.length) { showToast("Нет товаров для экспорта"); return; }
         const json = JSON.stringify(products, null, 2);
@@ -244,7 +247,6 @@
         showToast("✅ Файл products.json скачан! Загрузите его на GitHub.");
     }
 
-    // ========== ДОБАВЛЕНИЕ/УДАЛЕНИЕ/РЕДАКТИРОВАНИЕ ==========
     function addProduct() {
         const name = document.getElementById("productName").value.trim();
         const desc = document.getElementById("productDesc").value.trim();
@@ -262,7 +264,6 @@
             images: [...currentImageFiles]
         });
         
-        // Очищаем форму
         document.getElementById("productName").value = "";
         document.getElementById("productDesc").value = "";
         document.getElementById("productPrice").value = "";
@@ -319,7 +320,6 @@
     function renderProducts() {
         const grid = document.getElementById("productsGrid");
         if (!products.length) { grid.innerHTML = '<div class="loading">Нет товаров. Добавьте их в админ-панели</div>'; return; }
-        
         grid.innerHTML = products.map(p => {
             const mainImg = p.images?.[0] || null;
             const avitoLink = p.avito_link || DEFAULT_AVITO;
@@ -338,13 +338,10 @@
                 </div>
             `;
         }).join('');
-        
         document.querySelectorAll(".cart-btn").forEach(btn => btn.addEventListener("click", e => addToCart(parseInt(btn.dataset.id))));
         document.querySelectorAll(".product-img").forEach(el => {
             const images = JSON.parse(el.getAttribute("data-images") || "[]");
-            if (images.length) {
-                el.addEventListener("click", () => openLightbox(images, 0));
-            }
+            if (images.length) el.addEventListener("click", () => openLightbox(images, 0));
         });
     }
 
@@ -369,6 +366,14 @@
                     <textarea id="edit-desc-${p.id}" placeholder="Описание">${escapeHtml(p.description || '')}</textarea>
                     <input type="text" id="edit-price-${p.id}" value="${escapeHtml(p.price || '')}" placeholder="Цена">
                     <input type="url" id="edit-avito-${p.id}" value="${p.avito_link || ''}" placeholder="Ссылка на Авито">
+                    <div class="edit-photos">
+                        ${(p.images || []).map(img => `<img src="${img}" style="width:50px;height:50px;object-fit:cover;border-radius:8px;">`).join('') || 'нет фото'}
+                    </div>
+                    <div class="edit-image-upload">
+                        <label class="image-upload-label" for="edit-images-${p.id}">📷 Добавить фото (до 10)</label>
+                        <input type="file" id="edit-images-${p.id}" accept="image/*" multiple style="display:none">
+                        <div id="edit-previews-${p.id}" class="edit-previews"></div>
+                    </div>
                     <div><button class="save-edit-btn" data-id="${p.id}">💾 Сохранить</button> <button class="cancel-edit-btn" data-id="${p.id}">Отмена</button></div>
                 </div>
             </div>
@@ -379,23 +384,57 @@
             const id = parseInt(btn.dataset.id);
             const fields = document.getElementById(`edit-fields-${id}`);
             fields.style.display = fields.style.display === "none" ? "flex" : "none";
+            
+            // Настраиваем загрузку фото для этого товара
+            const fileInput = document.getElementById(`edit-images-${id}`);
+            const previewDiv = document.getElementById(`edit-previews-${id}`);
+            if (fileInput && !fileInput.hasListener) {
+                fileInput.hasListener = true;
+                let newImages = [];
+                fileInput.onchange = (ev) => {
+                    previewDiv.innerHTML = '';
+                    newImages = [];
+                    const files = ev.target.files;
+                    if (files.length > 10) { showToast("Можно добавить не более 10 фото!"); return; }
+                    [...files].forEach(f => {
+                        const r = new FileReader();
+                        r.onload = (event) => {
+                            const div = document.createElement('div');
+                            div.className = 'preview-item';
+                            div.innerHTML = `<img src="${event.target.result}"><div class="remove-preview" onclick="this.parentElement.remove(); newImages = newImages.filter(img => img !== '${event.target.result}')">×</div>`;
+                            previewDiv.appendChild(div);
+                            newImages.push(event.target.result);
+                        };
+                        r.readAsDataURL(f);
+                    });
+                };
+                window[`editNewImages_${id}`] = () => newImages;
+            }
         }));
-        document.querySelectorAll(".save-edit-btn").forEach(btn => btn.addEventListener("click", e => {
+        
+        document.querySelectorAll(".save-edit-btn").forEach(btn => btn.addEventListener("click", async e => {
             const id = parseInt(btn.dataset.id);
             const name = document.getElementById(`edit-name-${id}`).value;
             const desc = document.getElementById(`edit-desc-${id}`).value;
             const price = document.getElementById(`edit-price-${id}`).value;
             const avito = document.getElementById(`edit-avito-${id}`).value;
-            updateProduct(id, name, desc, price, avito, []);
+            const oldProduct = products.find(p => p.id === id);
+            const newImagesRaw = window[`editNewImages_${id}`] ? window[`editNewImages_${id}`]() : [];
+            const allImages = [...(oldProduct.images || []), ...newImagesRaw];
+            if (allImages.length > 10) { showToast("Можно хранить не более 10 фото на товар!"); return; }
+            await updateProduct(id, name, desc, price, avito, allImages);
             document.getElementById(`edit-fields-${id}`).style.display = "none";
+            // Очищаем временные данные
+            delete window[`editNewImages_${id}`];
         }));
+        
         document.querySelectorAll(".cancel-edit-btn").forEach(btn => btn.addEventListener("click", e => {
             const id = parseInt(btn.dataset.id);
             document.getElementById(`edit-fields-${id}`).style.display = "none";
+            delete window[`editNewImages_${id}`];
         }));
     }
 
-    // ========== КОРЗИНА ==========
     function extractPriceNumber(priceStr) {
         if (!priceStr) return 0;
         const match = String(priceStr).match(/\d+/);
@@ -489,7 +528,6 @@
         }
     }
 
-    // ========== ФОТО ==========
     function handleFiles(files) {
         const pv = document.getElementById("imagePreviews");
         pv.innerHTML = "";
@@ -501,7 +539,7 @@
                 const div = document.createElement("div");
                 div.className = "preview-item";
                 div.innerHTML = `<img src="${ev.target.result}"><div class="remove-preview" onclick="this.parentElement.remove(); currentImageFiles = currentImageFiles.filter(img => img !== '${ev.target.result}')">×</div>`;
-                pv.appendChild(div);
+                document.getElementById("imagePreviews").appendChild(div);
                 currentImageFiles.push(ev.target.result);
             };
             r.readAsDataURL(f);
@@ -521,7 +559,6 @@
         if (e.target.files.length) handleFiles(e.target.files);
     });
 
-    // ========== АДМИН ПАРОЛЬ ==========
     function showPasswordModal() { document.getElementById("passwordModal").classList.add("active"); document.getElementById("adminPassword").value = ""; document.getElementById("passwordError").style.display = "none"; }
     function loginAdmin(pw) {
         if (pw === ADMIN_PASSWORD) {
@@ -542,7 +579,6 @@
         showToast("Вы вышли");
     }
 
-    // ========== ОБРАБОТЧИКИ ==========
     document.getElementById("addProductBtn")?.addEventListener("click", addProduct);
     document.getElementById("exportProductsBtn")?.addEventListener("click", exportProducts);
     document.getElementById("resetFormBtn")?.addEventListener("click", () => {
