@@ -35,10 +35,10 @@
         .image-upload-area { border: 2px dashed #e2cfbf; border-radius: 20px; padding: 20px; text-align: center; background: #fffaf5; transition: all 0.2s; cursor: pointer; }
         .image-upload-area.drag-over { background: #e8f0fe; border-color: #9c6e42; }
         .image-upload-label { display: inline-block; background: #9c6e42; color: white; padding: 10px 20px; border-radius: 40px; cursor: pointer; margin: 8px 0; }
-        .image-previews { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; justify-content: center; }
-        .preview-item { position: relative; width: 80px; height: 80px; border-radius: 12px; overflow: hidden; border: 2px solid #e2cfbf; }
+        .image-previews { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; justify-content: flex-start; max-height: 200px; overflow-y: auto; padding: 8px; }
+        .preview-item { position: relative; width: 80px; height: 80px; border-radius: 12px; overflow: hidden; border: 2px solid #e2cfbf; flex-shrink: 0; }
         .preview-item img { width: 100%; height: 100%; object-fit: cover; }
-        .remove-preview { position: absolute; top: -8px; right: -8px; background: #c26e3c; color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; }
+        .remove-preview { position: absolute; top: -8px; right: -8px; background: #c26e3c; color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; z-index: 10; }
         .admin-buttons-row { display: flex; gap: 12px; margin-top: 8px; }
         .admin-buttons-row button { flex: 1; background: #9c6e42; color: white; border: none; padding: 14px; border-radius: 40px; font-weight: bold; cursor: pointer; }
         .admin-buttons-row button.secondary { background: #e7dbcf; color: #4f3a28; }
@@ -48,6 +48,8 @@
         .admin-product-header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
         .admin-product-title { font-weight: 700; }
         .admin-product-price { color: #9c6e42; }
+        .admin-product-photos { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+        .admin-product-photos img { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; }
         .admin-product-actions { display: flex; gap: 8px; margin-top: 8px; }
         .edit-btn, .delete-btn { padding: 4px 12px; border: none; border-radius: 20px; cursor: pointer; background: #e7dbcf; }
         .delete-btn { background: #f0cfc3; }
@@ -74,7 +76,6 @@
         .avito-buy-btn { background: #00A550; color: white; text-align: center; text-decoration: none; display: block; width: 100%; padding: 10px; border-radius: 40px; font-weight: 600; margin-top: 0; }
         .loading { text-align: center; padding: 60px; color: #9c7c60; }
 
-        /* Lightbox для увеличенных фото */
         .lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; justify-content: center; align-items: center; flex-direction: column; }
         .lightbox.active { display: flex; }
         .lightbox-img { max-width: 90%; max-height: 80%; object-fit: contain; }
@@ -142,9 +143,9 @@
             </div>
             <textarea id="productDesc" placeholder="Описание товара"></textarea>
             <div class="image-upload-area" id="dropZone">
-                <div><i class="fas fa-images"></i> Перетащите фото или нажмите для выбора (до 5 шт)</div>
+                <div><i class="fas fa-images"></i> Перетащите фото или нажмите для выбора (до 10 шт)</div>
                 <input type="file" id="productImages" accept="image/*" multiple style="display:none">
-                <label for="productImages" class="image-upload-label"><i class="fas fa-upload"></i> Выбрать фото</label>
+                <label for="productImages" class="image-upload-label"><i class="fas fa-upload"></i> Выбрать фото (до 10)</label>
                 <div id="imagePreviews" class="image-previews"></div>
             </div>
             <div class="admin-buttons-row">
@@ -355,6 +356,9 @@
                     <span class="admin-product-title">${escapeHtml(p.name)}</span>
                     <span class="admin-product-price">${escapeHtml(p.price || '')}</span>
                 </div>
+                <div class="admin-product-photos">
+                    ${(p.images || []).map(img => `<img src="${img}" style="width:50px;height:50px;object-fit:cover;border-radius:8px;">`).join('') || '<span style="font-size:0.7rem;color:#b29272;">нет фото</span>'}
+                </div>
                 <div class="admin-product-actions">
                     <button class="edit-btn" data-id="${p.id}">✏️ Редактировать</button>
                     <button class="delete-btn" data-id="${p.id}">🗑️ Удалить</button>
@@ -482,7 +486,7 @@
         const pv = document.getElementById("imagePreviews");
         pv.innerHTML = "";
         currentImageFiles = [];
-        if (files.length > 5) { showToast("Можно загрузить не более 5 фото!"); return; }
+        if (files.length > 10) { showToast("Можно загрузить не более 10 фото!"); return; }
         [...files].forEach(f => {
             const r = new FileReader();
             r.onload = ev => {
