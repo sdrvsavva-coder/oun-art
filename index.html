@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>OUN ART — Гипсовый декор</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #fefaf5; color: #2c2418; line-height: 1.4; }
@@ -22,11 +23,17 @@
         .social-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-size: 0.9rem; }
         .social-links a { color: #6b5a48; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 
+        .auth-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
+        .auth-modal.active { display: flex; }
+        .auth-content { background: white; border-radius: 32px; padding: 32px; max-width: 400px; width: 90%; text-align: center; }
+        .auth-content input { width: 100%; padding: 12px; border-radius: 16px; border: 1px solid #e2cfbf; margin: 12px 0; }
+        .auth-content button { background: #9c6e42; color: white; border: none; padding: 12px; border-radius: 40px; width: 100%; cursor: pointer; }
+        .auth-error { color: red; margin-top: 8px; display: none; }
+
         .admin-panel { background: white; border-radius: 28px; padding: 24px; margin: 20px 0; border: 2px solid #e7d9ce; display: none; }
         .admin-panel.active { display: block; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
         .admin-title { font-size: 1.5rem; font-weight: 700; color: #9c6e42; }
-        .admin-note { background: #e8f0fe; padding: 12px; border-radius: 12px; margin-bottom: 16px; font-size: 0.85rem; }
         .admin-form { display: flex; flex-direction: column; gap: 16px; background: #f9f5ef; padding: 20px; border-radius: 20px; }
         .admin-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
         .admin-form input, .admin-form textarea { padding: 12px; border: 1px solid #e2cfbf; border-radius: 16px; width: 100%; }
@@ -51,12 +58,6 @@
         .delete-btn { background: #f0cfc3; }
         .edit-fields { display: none; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eedbcb; }
         .edit-fields input, .edit-fields textarea { padding: 8px; border-radius: 12px; border: 1px solid #e2cfbf; }
-
-        .password-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
-        .password-modal.active { display: flex; }
-        .password-content { background: white; border-radius: 32px; padding: 32px; max-width: 400px; width: 90%; text-align: center; }
-        .password-content input { width: 100%; padding: 12px; border-radius: 16px; border: 1px solid #e2cfbf; margin: 16px 0; }
-        .password-content button { background: #9c6e42; color: white; border: none; padding: 12px; border-radius: 40px; width: 100%; cursor: pointer; }
 
         .section-title { font-size: 2rem; font-weight: 600; margin: 40px 0 24px; border-left: 6px solid #c6a27a; padding-left: 20px; }
         .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 30px; margin-bottom: 60px; }
@@ -115,9 +116,6 @@
             <div class="admin-title"><i class="fas fa-cog"></i> Управление товарами</div>
             <button id="logoutAdminBtn" style="background:#e7dbcf; border:none; padding:6px 12px; border-radius:30px;">Выйти</button>
         </div>
-        <div class="admin-note">
-            <i class="fas fa-info-circle"></i> Товары сохраняются в вашем браузере. После добавления нажмите <strong>«Сохранить изменения»</strong> и обновите страницу.
-        </div>
         <div class="admin-form">
             <div class="admin-form-row">
                 <input type="text" id="productName" placeholder="Название товара">
@@ -132,14 +130,11 @@
             </div>
             <div class="admin-buttons-row">
                 <button id="addProductBtn">➕ Добавить товар</button>
-                <button id="saveProductsBtn" class="secondary">💾 Сохранить изменения</button>
                 <button id="resetFormBtn" class="secondary">🗑️ Сбросить</button>
             </div>
         </div>
         <div class="products-admin-list" id="adminProductsList"></div>
-        <p style="font-size:0.7rem; margin-top:12px; color:#b29272;">
-            После добавления товара нажмите «Сохранить изменения». Затем обновите страницу, чтобы увидеть товары.
-        </p>
+        <p style="font-size:0.7rem; margin-top:12px; color:#b29272;">Товары хранятся в облаке. Изменения видны всем сразу.</p>
     </div>
 
     <h2 class="section-title">✨ Наши изделия из гипса</h2>
@@ -156,113 +151,120 @@
     </div>
 </div>
 
-<div id="passwordModal" class="password-modal">
-    <div class="password-content">
+<div id="authModal" class="auth-modal">
+    <div class="auth-content">
         <h3>🔐 Вход в админ-панель</h3>
-        <input type="password" id="adminPassword" placeholder="Пароль">
-        <button id="submitPasswordBtn">Войти</button>
-        <div id="passwordError" style="color:red; margin-top:8px; display:none;">Неверный пароль</div>
+        <input type="email" id="loginEmail" placeholder="Email" value="admin@ounart.ru">
+        <input type="password" id="loginPassword" placeholder="Пароль">
+        <button id="loginBtn">Войти</button>
+        <div id="authError" class="auth-error">Неверный email или пароль</div>
     </div>
 </div>
 <div id="toastMsg" class="toast"></div>
 
 <script>
-    const ADMIN_PASSWORD = "classmate@$^";
-    const DEFAULT_AVITO = "https://www.avito.ru/brands/eb053d7096bb77164298b6f7e5f935a5?src=sharing";
+    const SUPABASE_URL = "https://sdjhyyrichtibizvaw.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_RvP8dcS4yt6iAafJYzib8w_NPDqWpfB";
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     
     let products = [];
     let cart = [];
     let isAdmin = false;
     let currentImageFiles = [];
 
-    // Загрузка товаров из localStorage
-    function loadProducts() {
-        const saved = localStorage.getItem("oun_products");
-        if (saved) {
-            try {
-                products = JSON.parse(saved);
-            } catch(e) {
-                products = getDemoProducts();
-            }
-        } else {
-            products = getDemoProducts();
+    // ========== АУТЕНТИФИКАЦИЯ ==========
+    async function login(email, password) {
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+            isAdmin = true;
+            sessionStorage.setItem("admin_session", "true");
+            document.getElementById("authModal").classList.remove("active");
+            document.getElementById("adminPanel").classList.add("active");
+            await loadProducts();
+            renderAdminList();
+            showToast("Добро пожаловать!");
+        } catch (error) {
+            document.getElementById("authError").style.display = "block";
         }
-        renderProducts();
-        if (isAdmin) renderAdminList();
     }
 
-    function saveProductsToStorage() {
-        localStorage.setItem("oun_products", JSON.stringify(products));
-        showToast("✅ Товары сохранены! Обновите страницу (F5), чтобы увидеть изменения.");
-        renderProducts();
-        if (isAdmin) renderAdminList();
+    async function logout() {
+        await supabase.auth.signOut();
+        isAdmin = false;
+        sessionStorage.removeItem("admin_session");
+        document.getElementById("adminPanel").classList.remove("active");
+        showToast("Вы вышли");
     }
 
-    function getDemoProducts() {
-        return [
-            { id: 1, name: "Избушка на курьих ножках", description: "Оживите сказку своими руками. Гипсовая избушка для свечей.", price: "300 ₽", images: [], avito_link: "" },
-            { id: 2, name: "Подсвечник «Лилия»", description: "Изящная форма для свечи-таблетки. Высота 7 см.", price: "450 ₽", images: [], avito_link: "" }
-        ];
+    async function checkSession() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            isAdmin = true;
+            sessionStorage.setItem("admin_session", "true");
+            document.getElementById("adminPanel").classList.add("active");
+            await loadProducts();
+            renderAdminList();
+        }
     }
 
-    function getNextId() {
-        return products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
+    // ========== ТОВАРЫ ==========
+    async function loadProducts() {
+        const grid = document.getElementById("productsGrid");
+        grid.innerHTML = '<div class="loading">Загрузка...</div>';
+        try {
+            const { data, error } = await supabase.from('products').select('*').order('id', { ascending: true });
+            if (error) throw error;
+            products = data || [];
+            renderProducts();
+            if (isAdmin) renderAdminList();
+        } catch(e) {
+            console.error(e);
+            grid.innerHTML = '<div class="loading">❌ Ошибка загрузки. Проверьте интернет и настройки Supabase</div>';
+        }
     }
 
-    function addProduct() {
+    async function addProduct() {
         const name = document.getElementById("productName").value.trim();
         const desc = document.getElementById("productDesc").value.trim();
         const price = document.getElementById("productPrice").value.trim() || "Цена не указана";
         const avito = document.getElementById("productAvitoLink").value.trim();
-        
-        if (!name || !desc) {
-            showToast("Заполните название и описание");
-            return;
-        }
-        
-        const newProduct = {
-            id: getNextId(),
-            name: name,
-            description: desc,
-            price: price,
-            avito_link: avito || "",
-            images: currentImageFiles
-        };
-        
-        products.push(newProduct);
-        renderAdminList();
-        
-        // Очищаем форму, но оставляем фото
-        document.getElementById("productName").value = "";
-        document.getElementById("productDesc").value = "";
-        document.getElementById("productPrice").value = "";
-        document.getElementById("productAvitoLink").value = "";
-        
-        showToast(`✅ Товар "${name}" добавлен! Нажмите «Сохранить изменения».`);
+        if (!name || !desc) { showToast("Заполните название и описание"); return; }
+        try {
+            await supabase.from('products').insert([{ name, description: desc, price, avito_link: avito || null, images: currentImageFiles }]);
+            showToast("✅ Товар добавлен");
+            document.getElementById("productName").value = "";
+            document.getElementById("productDesc").value = "";
+            document.getElementById("productPrice").value = "";
+            document.getElementById("productAvitoLink").value = "";
+            document.getElementById("imagePreviews").innerHTML = "";
+            currentImageFiles = [];
+            await loadProducts();
+        } catch(e) { showToast("❌ Ошибка добавления"); }
     }
 
-    function deleteProduct(id) {
+    async function deleteProduct(id) {
         if (!confirm("Удалить товар?")) return;
-        products = products.filter(p => p.id !== id);
-        renderAdminList();
-        showToast("✅ Товар удален. Нажмите «Сохранить изменения».");
+        try {
+            await supabase.from('products').delete().eq('id', id);
+            showToast("✅ Удалено");
+            await loadProducts();
+        } catch(e) { showToast("❌ Ошибка удаления"); }
     }
 
-    function updateProduct(id, name, desc, price, avito, images) {
-        const index = products.findIndex(p => p.id === id);
-        if (index === -1) return;
-        products[index] = { ...products[index], name, description: desc, price, avito_link: avito, images };
-        renderAdminList();
-        showToast("✅ Товар обновлен. Нажмите «Сохранить изменения».");
+    async function updateProduct(id, name, desc, price, avito, images) {
+        try {
+            await supabase.from('products').update({ name, description: desc, price, avito_link: avito, images }).eq('id', id);
+            showToast("✅ Обновлено");
+            await loadProducts();
+        } catch(e) { showToast("❌ Ошибка обновления"); }
     }
 
     function renderProducts() {
         const grid = document.getElementById("productsGrid");
-        if (!products.length) {
-            grid.innerHTML = '<div class="loading">Нет товаров. Добавьте их в админ-панели</div>';
-            return;
-        }
-        
+        if (!products.length) { grid.innerHTML = '<div class="loading">Нет товаров. Добавьте в админ-панели</div>'; return; }
+        const DEFAULT_AVITO = "https://www.avito.ru/brands/eb053d7096bb77164298b6f7e5f935a5?src=sharing";
         grid.innerHTML = products.map(p => {
             const mainImg = p.images?.[0] || null;
             const avitoLink = p.avito_link || DEFAULT_AVITO;
@@ -281,25 +283,19 @@
                 </div>
             `;
         }).join('');
-        
-        document.querySelectorAll(".cart-btn").forEach(btn => {
-            btn.addEventListener("click", e => addToCart(parseInt(btn.dataset.id)));
-        });
+        document.querySelectorAll(".cart-btn").forEach(btn => btn.addEventListener("click", e => addToCart(parseInt(btn.dataset.id))));
     }
 
     function renderAdminList() {
         const container = document.getElementById("adminProductsList");
-        if (!products.length) {
-            container.innerHTML = "<div style='padding:20px;text-align:center;'>Нет товаров. Добавьте первый</div>";
-            return;
-        }
-        
+        if (!products.length) { container.innerHTML = "<div>Нет товаров. Добавьте первый</div>"; return; }
         container.innerHTML = products.map(p => `
             <div class="admin-product-item" data-id="${p.id}">
                 <div class="admin-product-header">
                     <span class="admin-product-title">${escapeHtml(p.name)}</span>
                     <span class="admin-product-price">${escapeHtml(p.price || '')}</span>
                 </div>
+                <div class="admin-product-photos">${(p.images || []).map(img => `<img src="${img}" style="width:40px;height:40px;object-fit:cover;border-radius:8px;">`).join('') || 'нет фото'}</div>
                 <div class="admin-product-actions">
                     <button class="edit-btn" data-id="${p.id}">✏️ Редактировать</button>
                     <button class="delete-btn" data-id="${p.id}">🗑️ Удалить</button>
@@ -314,39 +310,28 @@
             </div>
         `).join('');
         
-        document.querySelectorAll(".delete-btn").forEach(btn => {
-            btn.addEventListener("click", e => deleteProduct(parseInt(btn.dataset.id)));
-        });
-        
-        document.querySelectorAll(".edit-btn").forEach(btn => {
-            btn.addEventListener("click", e => {
-                const id = parseInt(btn.dataset.id);
-                const fields = document.getElementById(`edit-fields-${id}`);
-                fields.style.display = fields.style.display === "none" ? "flex" : "none";
-            });
-        });
-        
-        document.querySelectorAll(".save-edit-btn").forEach(btn => {
-            btn.addEventListener("click", e => {
-                const id = parseInt(btn.dataset.id);
-                const name = document.getElementById(`edit-name-${id}`).value;
-                const desc = document.getElementById(`edit-desc-${id}`).value;
-                const price = document.getElementById(`edit-price-${id}`).value;
-                const avito = document.getElementById(`edit-avito-${id}`).value;
-                updateProduct(id, name, desc, price, avito, []);
-                document.getElementById(`edit-fields-${id}`).style.display = "none";
-            });
-        });
-        
-        document.querySelectorAll(".cancel-edit-btn").forEach(btn => {
-            btn.addEventListener("click", e => {
-                const id = parseInt(btn.dataset.id);
-                document.getElementById(`edit-fields-${id}`).style.display = "none";
-            });
-        });
+        document.querySelectorAll(".delete-btn").forEach(btn => btn.addEventListener("click", e => deleteProduct(parseInt(btn.dataset.id))));
+        document.querySelectorAll(".edit-btn").forEach(btn => btn.addEventListener("click", e => {
+            const id = parseInt(btn.dataset.id);
+            const fields = document.getElementById(`edit-fields-${id}`);
+            fields.style.display = fields.style.display === "none" ? "flex" : "none";
+        }));
+        document.querySelectorAll(".save-edit-btn").forEach(btn => btn.addEventListener("click", async e => {
+            const id = parseInt(btn.dataset.id);
+            const name = document.getElementById(`edit-name-${id}`).value;
+            const desc = document.getElementById(`edit-desc-${id}`).value;
+            const price = document.getElementById(`edit-price-${id}`).value;
+            const avito = document.getElementById(`edit-avito-${id}`).value;
+            await updateProduct(id, name, desc, price, avito, []);
+            document.getElementById(`edit-fields-${id}`).style.display = "none";
+        }));
+        document.querySelectorAll(".cancel-edit-btn").forEach(btn => btn.addEventListener("click", e => {
+            const id = parseInt(btn.dataset.id);
+            document.getElementById(`edit-fields-${id}`).style.display = "none";
+        }));
     }
 
-    // Корзина
+    // ========== КОРЗИНА ==========
     function addToCart(id) {
         const p = products.find(p => p.id === id);
         if (!p) return;
@@ -362,17 +347,15 @@
         const container = document.getElementById("cartItemsContainer");
         if (!cart.length) { container.innerHTML = "Корзина пуста"; return; }
         container.innerHTML = cart.map(i => `<div class="cart-item"><span>${escapeHtml(i.name)} — ${escapeHtml(i.price)} × ${i.qty}</span><button class="cart-remove" data-id="${i.id}">🗑️</button></div>`).join('');
-        document.querySelectorAll(".cart-remove").forEach(btn => {
-            btn.addEventListener("click", e => {
-                cart = cart.filter(i => i.id !== parseInt(btn.dataset.id));
-                saveCart();
-                renderCart();
-            });
-        });
+        document.querySelectorAll(".cart-remove").forEach(btn => btn.addEventListener("click", e => {
+            cart = cart.filter(i => i.id !== parseInt(btn.dataset.id));
+            saveCart();
+            renderCart();
+        }));
     }
     function clearCart() { cart = []; saveCart(); renderCart(); showToast("Корзина очищена"); }
 
-    // Фото
+    // ========== ФОТО ==========
     document.getElementById("productImages")?.addEventListener("change", e => {
         const pv = document.getElementById("imagePreviews");
         pv.innerHTML = "";
@@ -391,29 +374,8 @@
         });
     });
 
-    // Админ-панель
-    function showPasswordModal() { document.getElementById("passwordModal").classList.add("active"); document.getElementById("adminPassword").value = ""; document.getElementById("passwordError").style.display = "none"; }
-    function loginAdmin(pw) {
-        if (pw === ADMIN_PASSWORD) {
-            isAdmin = true;
-            sessionStorage.setItem("admin", "true");
-            document.getElementById("passwordModal").classList.remove("active");
-            document.getElementById("adminPanel").classList.add("active");
-            renderAdminList();
-            showToast("Добро пожаловать!");
-        } else {
-            document.getElementById("passwordError").style.display = "block";
-        }
-    }
-    function logoutAdmin() {
-        isAdmin = false;
-        sessionStorage.removeItem("admin");
-        document.getElementById("adminPanel").classList.remove("active");
-        showToast("Вы вышли");
-    }
-
+    // ========== ОБРАБОТЧИКИ ==========
     document.getElementById("addProductBtn")?.addEventListener("click", addProduct);
-    document.getElementById("saveProductsBtn")?.addEventListener("click", saveProductsToStorage);
     document.getElementById("resetFormBtn")?.addEventListener("click", () => {
         document.getElementById("productName").value = "";
         document.getElementById("productDesc").value = "";
@@ -424,10 +386,21 @@
         document.getElementById("productImages").value = "";
         showToast("🧹 Форма очищена");
     });
-    document.getElementById("adminToggleBtn")?.addEventListener("click", () => isAdmin ? document.getElementById("adminPanel").classList.toggle("active") : showPasswordModal());
-    document.getElementById("submitPasswordBtn")?.addEventListener("click", () => loginAdmin(document.getElementById("adminPassword").value));
-    document.getElementById("adminPassword")?.addEventListener("keypress", e => { if (e.key === "Enter") loginAdmin(e.target.value); });
-    document.getElementById("logoutAdminBtn")?.addEventListener("click", logoutAdmin);
+    document.getElementById("adminToggleBtn")?.addEventListener("click", () => {
+        if (isAdmin) {
+            document.getElementById("adminPanel").classList.toggle("active");
+            if (document.getElementById("adminPanel").classList.contains("active")) renderAdminList();
+        } else {
+            document.getElementById("authModal").classList.add("active");
+            document.getElementById("authError").style.display = "none";
+        }
+    });
+    document.getElementById("loginBtn")?.addEventListener("click", () => {
+        const email = document.getElementById("loginEmail").value;
+        const password = document.getElementById("loginPassword").value;
+        login(email, password);
+    });
+    document.getElementById("logoutAdminBtn")?.addEventListener("click", logout);
     document.getElementById("cartIconBtn")?.addEventListener("click", () => { renderCart(); document.getElementById("cartModal").classList.add("active"); });
     document.getElementById("closeCartBtn")?.addEventListener("click", () => document.getElementById("cartModal").classList.remove("active"));
     document.getElementById("clearCartBtn")?.addEventListener("click", clearCart);
@@ -435,7 +408,7 @@
     function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
     function showToast(m) { const t = document.getElementById("toastMsg"); t.innerText = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000); }
 
-    if (sessionStorage.getItem("admin") === "true") { isAdmin = true; document.getElementById("adminPanel").classList.add("active"); renderAdminList(); }
+    checkSession();
     loadProducts();
     const savedCart = localStorage.getItem("oun_cart");
     if (savedCart) try { cart = JSON.parse(savedCart); updateCartCounter(); } catch(e) {}
