@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>OUN ART — Гипсовый декор</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #fefaf5; color: #2c2418; line-height: 1.4; }
@@ -132,13 +133,13 @@
             </div>
             <div class="admin-buttons-row">
                 <button id="addProductBtn">➕ Добавить товар</button>
-                <button id="saveProductsBtn" class="secondary">💾 Сохранить в Google Таблицу</button>
+                <button id="saveProductsBtn" class="secondary">💾 Сохранить в базу</button>
                 <button id="resetFormBtn" class="secondary">🗑️ Сбросить</button>
             </div>
         </div>
         <div class="products-admin-list" id="adminProductsList"></div>
         <p style="font-size:0.7rem; margin-top:12px; color:#b29272;">
-            После добавления/изменения товаров нажмите «Сохранить в Google Таблицу» — изменения сразу увидят все покупатели.
+            Товары хранятся в облачной базе Supabase. Изменения видны всем сразу!
         </p>
     </div>
 
@@ -176,17 +177,14 @@
 <div id="toastMsg" class="toast"></div>
 
 <script>
+    const SUPABASE_URL = "https://sdjhyyrichtibizvaw.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_RvP8dcS4yt6iAafJYzib8w_NPDqWpfB";
     const ADMIN_PASSWORD = "classmate@$^";
     const TELEGRAM_BOT_TOKEN = "8639109854:AAGfLAsx8p9hCsewCBUBA4vRYLXIhF-2VYM";
     const TELEGRAM_CHAT_ID = "1640384547";
     const DEFAULT_AVITO = "https://www.avito.ru/brands/eb053d7096bb77164298b6f7e5f935a5?src=sharing";
     
-    // Google Sheets CSV URL (чтение)
-    const GOOGLE_SHEET_ID = "1tn96B4WQqDNsGL57MBLXUjBlJ-CyYvbBlDnYOQNVdAo";
-    const CSV_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv`;
-    
-    // Apps Script URL (запись)
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9YJg7jQpnhY_QQ0-s6M7vRho6YfdVj6G6Icg2srMTxv1CBOT8IHrsn4pjYusm6OB9/exec";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     
     let products = [];
     let cart = [];
@@ -196,96 +194,53 @@
     // ========== ЗАГРУЗКА ТОВАРОВ ==========
     async function loadProducts() {
         const grid = document.getElementById("productsGrid");
-        grid.innerHTML = '<div class="loading">Загрузка товаров...</div>';
+        grid.innerHTML = '<div class="loading">Загрузка...</div>';
         try {
-            const response = await fetch(CSV_URL);
-            const csvText = await response.text();
-            const rows = csvText.split('\n').filter(row => row.trim());
-            if (rows.length < 2) {
-                grid.innerHTML = '<div class="loading">Нет товаров. Добавьте их в админ-панели</div>';
-                return;
-            }
+            const { data, error } = await supabase
+                .from('products')
+                .select('*')
+                .order('id', { ascending: true });
             
-            const headers = parseCSVRow(rows[0]).map(h => h.replace(/["']/g, '').trim().toLowerCase());
-            const colId = headers.findIndex(h => h === 'id');
-            const colName = headers.findIndex(h => h === 'название');
-            const colDesc = headers.findIndex(h => h === 'описание');
-            const colPrice = headers.findIndex(h => h === 'цена');
-            const colAvito = headers.findIndex(h => h === 'авито_ссылка');
-            const colPhoto = headers.findIndex(h => h === 'фото');
-            
-            const newProducts = [];
-            for (let i = 1; i < rows.length; i++) {
-                const values = parseCSVRow(rows[i]);
-                if (!values[colId] || values[colId] === 'id') continue;
-                
-                let images = [];
-                if (colPhoto !== -1 && values[colPhoto]) {
-                    try {
-                        images = JSON.parse(values[colPhoto].replace(/""/g, '"'));
-                    } catch(e) {}
-                }
-                
-                newProducts.push({
-                    id: parseInt(values[colId]) || i,
-                    name: colName !== -1 ? (values[colName]?.replace(/["']/g, '').trim() || "Товар") : "Товар",
-                    description: colDesc !== -1 ? (values[colDesc]?.replace(/["']/g, '').trim() || "") : "",
-                    price: colPrice !== -1 ? (values[colPrice]?.replace(/["']/g, '').trim() || "Цена не указана") : "Цена не указана",
-                    avito_link: colAvito !== -1 ? (values[colAvito]?.replace(/["']/g, '').trim() || "") : "",
-                    images: images
-                });
-            }
-            
-            products = newProducts;
+            if (error) throw error;
+            products = data || [];
             renderProducts();
             if (isAdmin) renderAdminList();
         } catch(e) {
             console.error(e);
-            grid.innerHTML = '<div class="loading">❌ Ошибка загрузки. Проверьте публикацию таблицы</div>';
+            grid.innerHTML = '<div class="loading">❌ Ошибка загрузки. Проверьте настройки Supabase</div>';
         }
     }
 
-    function parseCSVRow(row) {
-        const result = [];
-        let inQuotes = false;
-        let current = '';
-        for (let i = 0; i < row.length; i++) {
-            const c = row[i];
-            if (c === '"') { inQuotes = !inQuotes; }
-            else if (c === ',' && !inQuotes) { result.push(current); current = ''; }
-            else { current += c; }
-        }
-        result.push(current);
-        return result;
-    }
-
-    // ========== СОХРАНЕНИЕ В GOOGLE SHEETS (автоматически) ==========
-    async function saveToGoogleSheets() {
+    // ========== СОХРАНЕНИЕ ТОВАРОВ ==========
+    async function saveProductsToSupabase() {
         if (!products.length) { showToast("Нет товаров для сохранения"); return; }
         showToast("💾 Сохранение...");
         
         try {
-            const response = await fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'save', products: products })
-            });
-            const result = await response.json();
-            if (result.success) {
-                showToast("✅ Товары сохранены! Обновляю страницу...");
-                setTimeout(() => {
-                    location.reload();
-                }, 1500);
-            } else {
-                showToast("❌ Ошибка сохранения");
-            }
+            // Сначала удаляем все старые товары
+            const { error: deleteError } = await supabase
+                .from('products')
+                .delete()
+                .neq('id', 0);
+            
+            if (deleteError) throw deleteError;
+            
+            // Затем добавляем новые
+            const { error: insertError } = await supabase
+                .from('products')
+                .insert(products);
+            
+            if (insertError) throw insertError;
+            
+            showToast("✅ Товары сохранены!");
+            await loadProducts();
         } catch(e) {
             console.error(e);
-            showToast("❌ Ошибка подключения. Проверьте интернет");
+            showToast("❌ Ошибка сохранения");
         }
     }
 
-    // ========== АДМИН ПАНЕЛЬ ==========
+    // ========== ДОБАВЛЕНИЕ ТОВАРА ==========
     function addProduct() {
         const name = document.getElementById("productName").value.trim();
         const desc = document.getElementById("productDesc").value.trim();
@@ -311,7 +266,7 @@
         currentImageFiles = [];
         renderAdminList();
         renderProducts();
-        showToast("✅ Товар добавлен. Нажмите «Сохранить»");
+        showToast("✅ Товар добавлен. Нажмите «Сохранить в базу»");
     }
 
     function deleteProduct(id) {
@@ -319,7 +274,7 @@
         products = products.filter(p => p.id !== id);
         renderAdminList();
         renderProducts();
-        showToast("✅ Товар удален. Нажмите «Сохранить»");
+        showToast("✅ Товар удален. Нажмите «Сохранить в базу»");
     }
 
     function updateProduct(id, name, desc, price, avito, images) {
@@ -328,7 +283,7 @@
         products[index] = { ...products[index], name, description: desc, price, avito_link: avito, images };
         renderAdminList();
         renderProducts();
-        showToast("✅ Товар обновлен. Нажмите «Сохранить»");
+        showToast("✅ Товар обновлен. Нажмите «Сохранить в базу»");
     }
 
     function renderProducts() {
@@ -530,7 +485,7 @@
 
     // ========== ОБРАБОТЧИКИ ==========
     document.getElementById("addProductBtn")?.addEventListener("click", addProduct);
-    document.getElementById("saveProductsBtn")?.addEventListener("click", saveToGoogleSheets);
+    document.getElementById("saveProductsBtn")?.addEventListener("click", saveProductsToSupabase);
     document.getElementById("resetFormBtn")?.addEventListener("click", () => {
         document.getElementById("productName").value = "";
         document.getElementById("productDesc").value = "";
