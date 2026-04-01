@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>OUN ART — Гипсовый декор</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #fefaf5; color: #2c2418; line-height: 1.4; }
@@ -27,6 +26,7 @@
         .admin-panel.active { display: block; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .admin-title { font-size: 1.5rem; font-weight: 700; color: #9c6e42; }
+        .admin-note { background: #e8f0fe; padding: 12px; border-radius: 12px; margin-bottom: 16px; font-size: 0.85rem; }
         .admin-form { display: flex; flex-direction: column; gap: 16px; background: #f9f5ef; padding: 20px; border-radius: 20px; }
         .admin-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
         .admin-form input, .admin-form textarea { padding: 12px; border: 1px solid #e2cfbf; border-radius: 16px; width: 100%; }
@@ -119,6 +119,9 @@
             <div class="admin-title"><i class="fas fa-cog"></i> Управление товарами</div>
             <button id="logoutAdminBtn" style="background:#e7dbcf; border:none; padding:6px 12px; border-radius:30px;">Выйти</button>
         </div>
+        <div class="admin-note">
+            <i class="fas fa-info-circle"></i> Добавляйте/редактируйте/удаляйте товары. После всех изменений нажмите «Экспортировать товары» и загрузите файл на GitHub.
+        </div>
         <div class="admin-form">
             <div class="admin-form-row">
                 <input type="text" id="productName" placeholder="Название товара">
@@ -133,13 +136,13 @@
             </div>
             <div class="admin-buttons-row">
                 <button id="addProductBtn">➕ Добавить товар</button>
-                <button id="saveProductsBtn" class="secondary">💾 Сохранить в базу</button>
+                <button id="exportProductsBtn" class="secondary">📥 Экспортировать товары</button>
                 <button id="resetFormBtn" class="secondary">🗑️ Сбросить</button>
             </div>
         </div>
         <div class="products-admin-list" id="adminProductsList"></div>
         <p style="font-size:0.7rem; margin-top:12px; color:#b29272;">
-            Товары хранятся в облачной базе Supabase. Изменения видны всем сразу!
+            После добавления/изменения товаров нажмите «Экспортировать товары», скачайте файл и загрузите его на GitHub.
         </p>
     </div>
 
@@ -177,61 +180,59 @@
 <div id="toastMsg" class="toast"></div>
 
 <script>
-    const SUPABASE_URL = "https://sdjhyyrichtibizvaw.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_RvP8dcS4yt6iAafJYzib8w_NPDqWpfB";
     const ADMIN_PASSWORD = "classmate@$^";
     const TELEGRAM_BOT_TOKEN = "8639109854:AAGfLAsx8p9hCsewCBUBA4vRYLXIhF-2VYM";
     const TELEGRAM_CHAT_ID = "1640384547";
     const DEFAULT_AVITO = "https://www.avito.ru/brands/eb053d7096bb77164298b6f7e5f935a5?src=sharing";
-    
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     
     let products = [];
     let cart = [];
     let isAdmin = false;
     let currentImageFiles = [];
 
-    async function loadProducts() {
-        const grid = document.getElementById("productsGrid");
-        grid.innerHTML = '<div class="loading">Загрузка...</div>';
-        try {
-            const { data, error } = await supabaseClient
-                .from('products')
-                .select('*')
-                .order('id', { ascending: true });
-            if (error) throw error;
-            products = data || [];
-            renderProducts();
-            if (isAdmin) renderAdminList();
-        } catch(e) {
-            console.error(e);
-            grid.innerHTML = '<div class="loading">❌ Ошибка загрузки. Проверьте настройки Supabase</div>';
+    // ========== ЗАГРУЗКА ТОВАРОВ ИЗ HTML (встроенные) ==========
+    function loadProductsFromCode() {
+        const stored = localStorage.getItem("oun_products");
+        if (stored) {
+            try {
+                products = JSON.parse(stored);
+            } catch(e) {
+                products = getDemoProducts();
+            }
+        } else {
+            products = getDemoProducts();
         }
+        renderProducts();
+        if (isAdmin) renderAdminList();
     }
 
-    async function saveProductsToSupabase() {
-        if (!products.length) { showToast("Нет товаров для сохранения"); return; }
-        showToast("💾 Сохранение...");
-        try {
-            const { error: deleteError } = await supabaseClient
-                .from('products')
-                .delete()
-                .neq('id', 0);
-            if (deleteError) throw deleteError;
-            
-            const { error: insertError } = await supabaseClient
-                .from('products')
-                .insert(products);
-            if (insertError) throw insertError;
-            
-            showToast("✅ Товары сохранены!");
-            await loadProducts();
-        } catch(e) {
-            console.error(e);
-            showToast("❌ Ошибка сохранения");
-        }
+    function getDemoProducts() {
+        return [
+            { id: 1, name: "Избушка на курьих ножках", description: "Оживите сказку своими руками. Гипсовая избушка для свечей.", price: "300 ₽", images: [], avito_link: "" },
+            { id: 2, name: "Подсвечник «Лилия»", description: "Изящная форма для свечи-таблетки. Высота 7 см.", price: "450 ₽", images: [], avito_link: "" }
+        ];
     }
 
+    function saveProductsToStorage() {
+        localStorage.setItem("oun_products", JSON.stringify(products));
+        renderProducts();
+        if (isAdmin) renderAdminList();
+    }
+
+    // ========== ЭКСПОРТ ТОВАРОВ ==========
+    function exportProducts() {
+        const json = JSON.stringify(products, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "products.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("✅ Файл products.json скачан! Загрузите его в репозиторий GitHub.");
+    }
+
+    // ========== ДОБАВЛЕНИЕ/УДАЛЕНИЕ/РЕДАКТИРОВАНИЕ ==========
     function addProduct() {
         const name = document.getElementById("productName").value.trim();
         const desc = document.getElementById("productDesc").value.trim();
@@ -255,31 +256,29 @@
         document.getElementById("productAvitoLink").value = "";
         document.getElementById("imagePreviews").innerHTML = "";
         currentImageFiles = [];
-        renderAdminList();
-        renderProducts();
-        showToast("✅ Товар добавлен. Нажмите «Сохранить в базу»");
+        saveProductsToStorage();
+        showToast("✅ Товар добавлен. Нажмите «Экспортировать товары»");
     }
 
     function deleteProduct(id) {
         if (!confirm("Удалить товар?")) return;
         products = products.filter(p => p.id !== id);
-        renderAdminList();
-        renderProducts();
-        showToast("✅ Товар удален. Нажмите «Сохранить в базу»");
+        saveProductsToStorage();
+        showToast("✅ Товар удален. Нажмите «Экспортировать товары»");
     }
 
     function updateProduct(id, name, desc, price, avito, images) {
         const index = products.findIndex(p => p.id === id);
         if (index === -1) return;
         products[index] = { ...products[index], name, description: desc, price, avito_link: avito, images };
-        renderAdminList();
-        renderProducts();
-        showToast("✅ Товар обновлен. Нажмите «Сохранить в базу»");
+        saveProductsToStorage();
+        showToast("✅ Товар обновлен. Нажмите «Экспортировать товары»");
     }
 
     function renderProducts() {
         const grid = document.getElementById("productsGrid");
         if (!products.length) { grid.innerHTML = '<div class="loading">Нет товаров. Добавьте их в админ-панели</div>'; return; }
+        
         grid.innerHTML = products.map(p => {
             const mainImg = p.images?.[0] || null;
             const avitoLink = p.avito_link || DEFAULT_AVITO;
@@ -298,6 +297,7 @@
                 </div>
             `;
         }).join('');
+        
         document.querySelectorAll(".cart-btn").forEach(btn => btn.addEventListener("click", e => addToCart(parseInt(btn.dataset.id))));
     }
 
@@ -345,6 +345,7 @@
         }));
     }
 
+    // ========== КОРЗИНА ==========
     async function sendOrderToTelegram(orderData) {
         const message = `🛍 НОВЫЙ ЗАКАЗ!\n\n👤 Имя: ${orderData.name}\n📧 Email: ${orderData.email}\n📞 Телефон: ${orderData.phone}\n💬 Telegram: ${orderData.telegram}\n\n📦 Товары:\n${orderData.items}\n\n💰 Сумма: ${orderData.total}`;
         const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -431,6 +432,7 @@
         }
     }
 
+    // ========== ФОТО ==========
     document.getElementById("productImages")?.addEventListener("change", e => {
         const pv = document.getElementById("imagePreviews");
         pv.innerHTML = "";
@@ -449,18 +451,7 @@
         });
     });
 
-    document.getElementById("addProductBtn")?.addEventListener("click", addProduct);
-    document.getElementById("saveProductsBtn")?.addEventListener("click", saveProductsToSupabase);
-    document.getElementById("resetFormBtn")?.addEventListener("click", () => {
-        document.getElementById("productName").value = "";
-        document.getElementById("productDesc").value = "";
-        document.getElementById("productPrice").value = "";
-        document.getElementById("productAvitoLink").value = "";
-        document.getElementById("imagePreviews").innerHTML = "";
-        currentImageFiles = [];
-        showToast("🧹 Форма очищена");
-    });
-
+    // ========== АДМИН ПАРОЛЬ ==========
     function showPasswordModal() { document.getElementById("passwordModal").classList.add("active"); document.getElementById("adminPassword").value = ""; document.getElementById("passwordError").style.display = "none"; }
     function loginAdmin(pw) {
         if (pw === ADMIN_PASSWORD) {
@@ -481,6 +472,18 @@
         showToast("Вы вышли");
     }
 
+    // ========== ОБРАБОТЧИКИ ==========
+    document.getElementById("addProductBtn")?.addEventListener("click", addProduct);
+    document.getElementById("exportProductsBtn")?.addEventListener("click", exportProducts);
+    document.getElementById("resetFormBtn")?.addEventListener("click", () => {
+        document.getElementById("productName").value = "";
+        document.getElementById("productDesc").value = "";
+        document.getElementById("productPrice").value = "";
+        document.getElementById("productAvitoLink").value = "";
+        document.getElementById("imagePreviews").innerHTML = "";
+        currentImageFiles = [];
+        showToast("🧹 Форма очищена");
+    });
     document.getElementById("adminToggleBtn")?.addEventListener("click", () => {
         if (isAdmin) {
             document.getElementById("adminPanel").classList.toggle("active");
@@ -505,7 +508,7 @@
         isAdmin = true;
         document.getElementById("adminPanel").classList.add("active");
     }
-    loadProducts();
+    loadProductsFromCode();
     const savedCart = localStorage.getItem("oun_cart");
     if (savedCart) try { cart = JSON.parse(savedCart); updateCartCounter(); } catch(e) {}
 </script>
