@@ -23,16 +23,9 @@
         .social-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-size: 0.9rem; }
         .social-links a { color: #6b5a48; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 
-        .auth-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
-        .auth-modal.active { display: flex; }
-        .auth-content { background: white; border-radius: 32px; padding: 32px; max-width: 400px; width: 90%; text-align: center; }
-        .auth-content input { width: 100%; padding: 12px; border-radius: 16px; border: 1px solid #e2cfbf; margin: 12px 0; }
-        .auth-content button { background: #9c6e42; color: white; border: none; padding: 12px; border-radius: 40px; width: 100%; cursor: pointer; }
-        .auth-error { color: red; margin-top: 8px; display: none; }
-
-        .admin-panel { background: white; border-radius: 28px; padding: 24px; margin: 20px 0; border: 2px solid #e7d9ce; display: none; }
-        .admin-panel.active { display: block; }
-        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+        .auth-modal, .admin-panel { background: white; border-radius: 28px; padding: 24px; margin: 20px 0; border: 2px solid #e7d9ce; display: none; }
+        .auth-modal.active, .admin-panel.active { display: block; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .admin-title { font-size: 1.5rem; font-weight: 700; color: #9c6e42; }
         .admin-form { display: flex; flex-direction: column; gap: 16px; background: #f9f5ef; padding: 20px; border-radius: 20px; }
         .admin-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
@@ -59,6 +52,11 @@
         .edit-fields { display: none; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eedbcb; }
         .edit-fields input, .edit-fields textarea { padding: 8px; border-radius: 12px; border: 1px solid #e2cfbf; }
 
+        .auth-content { background: white; border-radius: 32px; padding: 32px; max-width: 400px; margin: 0 auto; text-align: center; }
+        .auth-content input { width: 100%; padding: 12px; border-radius: 16px; border: 1px solid #e2cfbf; margin: 12px 0; }
+        .auth-content button { background: #9c6e42; color: white; border: none; padding: 12px; border-radius: 40px; width: 100%; cursor: pointer; }
+        .auth-error { color: red; margin-top: 8px; display: none; }
+
         .section-title { font-size: 2rem; font-weight: 600; margin: 40px 0 24px; border-left: 6px solid #c6a27a; padding-left: 20px; }
         .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 30px; margin-bottom: 60px; }
         .product-card { background: white; border-radius: 28px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.05); border: 1px solid #f0e2d4; display: flex; flex-direction: column; height: 100%; }
@@ -77,6 +75,9 @@
         .cart-content { background: white; max-width: 500px; width: 90%; border-radius: 28px; padding: 20px; max-height: 80vh; overflow-y: auto; }
         .cart-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eedbcb; }
         .btn-clear { background: #e7dbcf; border: none; padding: 10px; border-radius: 40px; width: 100%; margin-top: 12px; cursor: pointer; }
+        .order-form { margin-top: 20px; padding-top: 20px; border-top: 2px solid #eedbcb; }
+        .order-form input, .order-form textarea { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #e2cfbf; border-radius: 12px; }
+        .order-form button { background: #9c6e42; color: white; border: none; padding: 12px; border-radius: 40px; width: 100%; cursor: pointer; font-weight: bold; }
         .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #2c2418; color: white; padding: 10px 20px; border-radius: 60px; z-index: 1100; opacity: 0; transition: 0.2s; }
         .toast.show { opacity: 1; }
         footer { text-align: center; padding: 40px 0; border-top: 1px solid #e7dbcf; color: #8e7a64; }
@@ -147,7 +148,16 @@
     <div class="cart-content">
         <div class="cart-header"><h2>Моя корзина</h2><button id="closeCartBtn" style="float:right; font-size:24px; background:none; border:none;">&times;</button></div>
         <div id="cartItemsContainer">Корзина пуста</div>
+        <div id="orderForm" class="order-form" style="display:none;">
+            <h3>Оформление заказа</h3>
+            <input type="text" id="orderName" placeholder="Ваше имя и фамилия *" required>
+            <input type="email" id="orderEmail" placeholder="Email *" required>
+            <input type="tel" id="orderPhone" placeholder="Телефон *" required>
+            <input type="text" id="orderTelegram" placeholder="Telegram (ник) *" required>
+            <button id="submitOrderBtn">📦 Отправить заказ</button>
+        </div>
         <button class="btn-clear" id="clearCartBtn">Очистить корзину</button>
+        <button id="checkoutBtn" class="btn-checkout" style="background:#9c6e42; color:white; border:none; padding:10px; border-radius:40px; width:100%; margin-top:12px; cursor:pointer;">✅ Оформить заказ</button>
     </div>
 </div>
 
@@ -165,6 +175,8 @@
 <script>
     const SUPABASE_URL = "https://sdjhyyrichtibizvaw.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_RvP8dcS4yt6iAafJYzib8w_NPDqWpfB";
+    const TELEGRAM_BOT_TOKEN = "8639109854:AAGfLAsx8p9hCsewCBUBA4vRYLXIhF-2VYM";
+    const TELEGRAM_CHAT_ID = "1640384547";
     
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     
@@ -206,6 +218,24 @@
             document.getElementById("adminPanel").classList.add("active");
             await loadProducts();
             renderAdminList();
+        }
+    }
+
+    // ========== ОТПРАВКА ЗАКАЗА В TELEGRAM ==========
+    async function sendOrderToTelegram(orderData) {
+        const message = `🛍 НОВЫЙ ЗАКАЗ!\n\n👤 Имя: ${orderData.name}\n📧 Email: ${orderData.email}\n📞 Телефон: ${orderData.phone}\n💬 Telegram: ${orderData.telegram}\n\n📦 Товары:\n${orderData.items}\n\n💰 Сумма: ${orderData.total}`;
+        
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message })
+            });
+            return response.ok;
+        } catch (error) {
+            console.error("Ошибка отправки в Telegram:", error);
+            return false;
         }
     }
 
@@ -338,22 +368,70 @@
         const existing = cart.find(i => i.id === id);
         existing ? existing.qty++ : cart.push({ id, name: p.name, price: p.price, qty: 1 });
         saveCart();
+        renderCart();
         showToast("🛒 В корзину добавлено");
     }
 
-    function saveCart() { localStorage.setItem("oun_cart", JSON.stringify(cart)); updateCartCounter(); }
+    function saveCart() { localStorage.setItem("oun_cart", JSON.stringify(cart)); updateCartCounter(); renderCart(); }
     function updateCartCounter() { document.getElementById("cartCounter").innerText = cart.reduce((s,i) => s + i.qty, 0); }
     function renderCart() {
         const container = document.getElementById("cartItemsContainer");
-        if (!cart.length) { container.innerHTML = "Корзина пуста"; return; }
+        if (!cart.length) { container.innerHTML = "Корзина пуста"; document.getElementById("orderForm").style.display = "none"; document.getElementById("checkoutBtn").style.display = "block"; return; }
         container.innerHTML = cart.map(i => `<div class="cart-item"><span>${escapeHtml(i.name)} — ${escapeHtml(i.price)} × ${i.qty}</span><button class="cart-remove" data-id="${i.id}">🗑️</button></div>`).join('');
         document.querySelectorAll(".cart-remove").forEach(btn => btn.addEventListener("click", e => {
             cart = cart.filter(i => i.id !== parseInt(btn.dataset.id));
             saveCart();
             renderCart();
+            if (!cart.length) document.getElementById("orderForm").style.display = "none";
         }));
+        document.getElementById("checkoutBtn").style.display = "block";
+        document.getElementById("orderForm").style.display = "none";
     }
+    
     function clearCart() { cart = []; saveCart(); renderCart(); showToast("Корзина очищена"); }
+    
+    function showOrderForm() {
+        if (!cart.length) { showToast("Корзина пуста"); return; }
+        document.getElementById("checkoutBtn").style.display = "none";
+        document.getElementById("orderForm").style.display = "block";
+    }
+    
+    async function submitOrder() {
+        const name = document.getElementById("orderName").value.trim();
+        const email = document.getElementById("orderEmail").value.trim();
+        const phone = document.getElementById("orderPhone").value.trim();
+        const telegram = document.getElementById("orderTelegram").value.trim();
+        
+        if (!name || !email || !phone || !telegram) {
+            showToast("Заполните все поля");
+            return;
+        }
+        
+        const itemsList = cart.map(i => `${i.name} — ${i.price} x ${i.qty}`).join("\n");
+        const total = cart.reduce((sum, i) => sum + (parseFloat(i.price) || 0) * i.qty, 0);
+        
+        const orderData = {
+            name, email, phone, telegram,
+            items: itemsList,
+            total: total ? `${total} ₽` : "по запросу"
+        };
+        
+        const sent = await sendOrderToTelegram(orderData);
+        if (sent) {
+            showToast("✅ Заказ отправлен! Мы свяжемся с вами в Telegram");
+            cart = [];
+            saveCart();
+            renderCart();
+            document.getElementById("orderForm").style.display = "none";
+            document.getElementById("checkoutBtn").style.display = "block";
+            document.getElementById("orderName").value = "";
+            document.getElementById("orderEmail").value = "";
+            document.getElementById("orderPhone").value = "";
+            document.getElementById("orderTelegram").value = "";
+        } else {
+            showToast("❌ Ошибка отправки. Попробуйте позже или напишите нам в Telegram");
+        }
+    }
 
     // ========== ФОТО ==========
     document.getElementById("productImages")?.addEventListener("change", e => {
@@ -404,6 +482,8 @@
     document.getElementById("cartIconBtn")?.addEventListener("click", () => { renderCart(); document.getElementById("cartModal").classList.add("active"); });
     document.getElementById("closeCartBtn")?.addEventListener("click", () => document.getElementById("cartModal").classList.remove("active"));
     document.getElementById("clearCartBtn")?.addEventListener("click", clearCart);
+    document.getElementById("checkoutBtn")?.addEventListener("click", showOrderForm);
+    document.getElementById("submitOrderBtn")?.addEventListener("click", submitOrder);
 
     function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
     function showToast(m) { const t = document.getElementById("toastMsg"); t.innerText = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000); }
