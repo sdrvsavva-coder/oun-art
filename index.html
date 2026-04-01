@@ -178,7 +178,7 @@
     const TELEGRAM_BOT_TOKEN = "8639109854:AAGfLAsx8p9hCsewCBUBA4vRYLXIhF-2VYM";
     const TELEGRAM_CHAT_ID = "1640384547";
     
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     
     let products = [];
     let cart = [];
@@ -188,7 +188,7 @@
     // ========== АУТЕНТИФИКАЦИЯ ==========
     async function login(email, password) {
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
             if (error) throw error;
             isAdmin = true;
             sessionStorage.setItem("admin_session", "true");
@@ -203,7 +203,7 @@
     }
 
     async function logout() {
-        await supabase.auth.signOut();
+        await supabaseClient.auth.signOut();
         isAdmin = false;
         sessionStorage.removeItem("admin_session");
         document.getElementById("adminPanel").classList.remove("active");
@@ -211,7 +211,7 @@
     }
 
     async function checkSession() {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await supabaseClient.auth.getSession();
         if (session) {
             isAdmin = true;
             sessionStorage.setItem("admin_session", "true");
@@ -244,7 +244,7 @@
         const grid = document.getElementById("productsGrid");
         grid.innerHTML = '<div class="loading">Загрузка...</div>';
         try {
-            const { data, error } = await supabase.from('products').select('*').order('id', { ascending: true });
+            const { data, error } = await supabaseClient.from('products').select('*').order('id', { ascending: true });
             if (error) throw error;
             products = data || [];
             renderProducts();
@@ -262,7 +262,7 @@
         const avito = document.getElementById("productAvitoLink").value.trim();
         if (!name || !desc) { showToast("Заполните название и описание"); return; }
         try {
-            await supabase.from('products').insert([{ name, description: desc, price, avito_link: avito || null, images: currentImageFiles }]);
+            await supabaseClient.from('products').insert([{ name, description: desc, price, avito_link: avito || null, images: currentImageFiles }]);
             showToast("✅ Товар добавлен");
             document.getElementById("productName").value = "";
             document.getElementById("productDesc").value = "";
@@ -277,7 +277,7 @@
     async function deleteProduct(id) {
         if (!confirm("Удалить товар?")) return;
         try {
-            await supabase.from('products').delete().eq('id', id);
+            await supabaseClient.from('products').delete().eq('id', id);
             showToast("✅ Удалено");
             await loadProducts();
         } catch(e) { showToast("❌ Ошибка удаления"); }
@@ -285,7 +285,7 @@
 
     async function updateProduct(id, name, desc, price, avito, images) {
         try {
-            await supabase.from('products').update({ name, description: desc, price, avito_link: avito, images }).eq('id', id);
+            await supabaseClient.from('products').update({ name, description: desc, price, avito_link: avito, images }).eq('id', id);
             showToast("✅ Обновлено");
             await loadProducts();
         } catch(e) { showToast("❌ Ошибка обновления"); }
