@@ -35,7 +35,7 @@
         .image-upload-area { border: 2px dashed #e2cfbf; border-radius: 20px; padding: 20px; text-align: center; background: #fffaf5; transition: all 0.2s; cursor: pointer; }
         .image-upload-area.drag-over { background: #e8f0fe; border-color: #9c6e42; }
         .image-upload-label { display: inline-block; background: #9c6e42; color: white; padding: 10px 20px; border-radius: 40px; cursor: pointer; margin: 8px 0; }
-        .image-previews { display: flex; flex-direction: row; gap: 12px; margin-top: 12px; overflow-x: auto; padding: 8px 4px; min-height: 100px; }
+        .image-previews { display: flex; flex-direction: row; gap: 12px; margin-top: 12px; overflow-x: auto; padding: 8px 4px; min-height: 100px; flex-wrap: nowrap; }
         .preview-item { position: relative; width: 80px; height: 80px; border-radius: 12px; overflow: hidden; border: 2px solid #e2cfbf; flex-shrink: 0; }
         .preview-item img { width: 100%; height: 100%; object-fit: cover; }
         .remove-preview { position: absolute; top: -8px; right: -8px; background: #c26e3c; color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; z-index: 10; }
@@ -138,7 +138,7 @@
         <div class="admin-form">
             <div class="admin-form-row">
                 <input type="text" id="productName" placeholder="Название товара">
-                <input type="text" id="productPrice" placeholder="Цена">
+                <input type="text" id="productPrice" placeholder="Цена (только цифры, например: 300)">
                 <input type="url" id="productAvitoLink" placeholder="Ссылка на Авито">
             </div>
             <textarea id="productDesc" placeholder="Описание товара"></textarea>
@@ -262,6 +262,7 @@
             images: [...currentImageFiles]
         });
         
+        // Очищаем форму
         document.getElementById("productName").value = "";
         document.getElementById("productDesc").value = "";
         document.getElementById("productPrice").value = "";
@@ -395,6 +396,12 @@
     }
 
     // ========== КОРЗИНА ==========
+    function extractPriceNumber(priceStr) {
+        if (!priceStr) return 0;
+        const match = String(priceStr).match(/\d+/);
+        return match ? parseInt(match[0]) : 0;
+    }
+
     async function sendOrderToTelegram(orderData) {
         const message = `🛍 НОВЫЙ ЗАКАЗ!\n\n👤 Имя: ${orderData.name}\n📧 Email: ${orderData.email}\n📞 Телефон: ${orderData.phone}\n💬 Telegram: ${orderData.telegram}\n\n📦 Товары:\n${orderData.items}\n\n💰 Сумма: ${orderData.total}`;
         const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -456,12 +463,13 @@
         }
         
         const itemsList = cart.map(i => `${i.name} — ${i.price} x ${i.qty}`).join("\n");
-        const total = cart.reduce((sum, i) => sum + (parseFloat(i.price) || 0) * i.qty, 0);
+        const totalSum = cart.reduce((sum, i) => sum + (extractPriceNumber(i.price) * i.qty), 0);
+        const totalText = totalSum > 0 ? `${totalSum} ₽` : "по запросу";
         
         const orderData = {
             name, email, phone, telegram,
             items: itemsList,
-            total: total ? `${total} ₽` : "по запросу"
+            total: totalText
         };
         
         const sent = await sendOrderToTelegram(orderData);
