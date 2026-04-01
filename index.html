@@ -148,7 +148,20 @@
     const ADMIN_PASSWORD = "classmate@$^";
     const DEFAULT_AVITO = "https://www.avito.ru/brands/eb053d7096bb77164298b6f7e5f935a5?src=sharing";
 
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Создаём клиент с прокси для обхода CORS
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: false },
+        db: { schema: 'public' },
+        global: {
+            fetch: async (url, options) => {
+                // Используем прокси для обхода блокировок
+                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+                const response = await fetch(proxyUrl, options);
+                const text = await response.text();
+                return new Response(text, { status: response.status, headers: response.headers });
+            }
+        }
+    });
     
     let products = [], cart = [], isAdmin = false;
 
@@ -160,9 +173,12 @@
             products = data || [];
             renderProducts();
             if (isAdmin) renderAdminList();
+            if (products.length === 0) {
+                document.getElementById("productsGrid").innerHTML = '<div class="loading">Нет товаров. Добавьте в админ-панели</div>';
+            }
         } catch(e) {
             console.error(e);
-            document.getElementById("productsGrid").innerHTML = '<div class="loading">❌ Ошибка загрузки. Проверьте таблицу products в Supabase</div>';
+            document.getElementById("productsGrid").innerHTML = '<div class="loading">❌ Ошибка загрузки. Проверьте интернет и настройки Supabase</div>';
         }
     }
 
