@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>OUN ART — Гипсовый декор</title>
-    <!-- Фавикон (мини-логотип) -->
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/1998/1998628.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
@@ -33,7 +32,8 @@
         .admin-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
         .admin-form input, .admin-form textarea { padding: 12px; border: 1px solid #e2cfbf; border-radius: 16px; width: 100%; }
         .admin-form textarea { min-height: 80px; }
-        .image-upload-area { border: 2px dashed #e2cfbf; border-radius: 20px; padding: 16px; text-align: center; background: #fffaf5; }
+        .image-upload-area { border: 2px dashed #e2cfbf; border-radius: 20px; padding: 20px; text-align: center; background: #fffaf5; transition: all 0.2s; cursor: pointer; }
+        .image-upload-area.drag-over { background: #e8f0fe; border-color: #9c6e42; }
         .image-upload-label { display: inline-block; background: #9c6e42; color: white; padding: 10px 20px; border-radius: 40px; cursor: pointer; margin: 8px 0; }
         .image-previews { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; justify-content: center; }
         .preview-item { position: relative; width: 80px; height: 80px; border-radius: 12px; overflow: hidden; border: 2px solid #e2cfbf; }
@@ -64,7 +64,7 @@
         .section-title { font-size: 2rem; font-weight: 600; margin: 40px 0 24px; border-left: 6px solid #c6a27a; padding-left: 20px; }
         .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 30px; margin-bottom: 60px; }
         .product-card { background: white; border-radius: 28px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.05); border: 1px solid #f0e2d4; display: flex; flex-direction: column; height: 100%; }
-        .product-img { background: #f9f2ea; height: 220px; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+        .product-img { background: #f9f2ea; height: 220px; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; cursor: pointer; }
         .product-img img { width: 100%; height: 100%; object-fit: cover; }
         .product-info { padding: 20px; flex: 1; display: flex; flex-direction: column; }
         .product-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; }
@@ -73,6 +73,16 @@
         .cart-btn { background: #f0e3d8; border: none; width: 100%; padding: 10px; border-radius: 40px; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
         .avito-buy-btn { background: #00A550; color: white; text-align: center; text-decoration: none; display: block; width: 100%; padding: 10px; border-radius: 40px; font-weight: 600; margin-top: 0; }
         .loading { text-align: center; padding: 60px; color: #9c7c60; }
+
+        /* Lightbox для увеличенных фото */
+        .lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; justify-content: center; align-items: center; flex-direction: column; }
+        .lightbox.active { display: flex; }
+        .lightbox-img { max-width: 90%; max-height: 80%; object-fit: contain; }
+        .lightbox-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; cursor: pointer; }
+        .lightbox-prev, .lightbox-next { position: absolute; top: 50%; transform: translateY(-50%); color: white; font-size: 40px; cursor: pointer; padding: 20px; }
+        .lightbox-prev { left: 20px; }
+        .lightbox-next { right: 20px; }
+        .lightbox-counter { position: absolute; bottom: 20px; color: white; font-size: 16px; }
 
         .cart-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
         .cart-modal.active { display: flex; }
@@ -131,9 +141,10 @@
                 <input type="url" id="productAvitoLink" placeholder="Ссылка на Авито">
             </div>
             <textarea id="productDesc" placeholder="Описание товара"></textarea>
-            <div class="image-upload-area">
+            <div class="image-upload-area" id="dropZone">
+                <div><i class="fas fa-images"></i> Перетащите фото или нажмите для выбора (до 5 шт)</div>
                 <input type="file" id="productImages" accept="image/*" multiple style="display:none">
-                <label for="productImages" class="image-upload-label"><i class="fas fa-upload"></i> Выбрать фото (до 5 шт)</label>
+                <label for="productImages" class="image-upload-label"><i class="fas fa-upload"></i> Выбрать фото</label>
                 <div id="imagePreviews" class="image-previews"></div>
             </div>
             <div class="admin-buttons-row">
@@ -179,6 +190,14 @@
         <div id="passwordError" class="password-error">Неверный пароль</div>
     </div>
 </div>
+
+<div id="lightbox" class="lightbox">
+    <span class="lightbox-close">&times;</span>
+    <span class="lightbox-prev">&#10094;</span>
+    <span class="lightbox-next">&#10095;</span>
+    <img class="lightbox-img" src="" alt="">
+    <div class="lightbox-counter"></div>
+</div>
 <div id="toastMsg" class="toast"></div>
 
 <script>
@@ -191,6 +210,8 @@
     let cart = [];
     let isAdmin = false;
     let currentImageFiles = [];
+    let currentLightboxImages = [];
+    let currentLightboxIndex = 0;
 
     // ========== ЗАГРУЗКА ТОВАРОВ ==========
     async function loadProducts() {
@@ -268,6 +289,31 @@
         showToast("✅ Товар обновлен. Нажмите «Экспортировать товары»");
     }
 
+    function openLightbox(images, index) {
+        currentLightboxImages = images;
+        currentLightboxIndex = index;
+        const lb = document.getElementById("lightbox");
+        lb.querySelector(".lightbox-img").src = images[index];
+        lb.querySelector(".lightbox-counter").textContent = `${index+1} / ${images.length}`;
+        lb.classList.add("active");
+    }
+
+    function closeLightbox() { document.getElementById("lightbox").classList.remove("active"); }
+    function prevImage() {
+        if (currentLightboxImages.length) {
+            currentLightboxIndex = (currentLightboxIndex - 1 + currentLightboxImages.length) % currentLightboxImages.length;
+            document.querySelector(".lightbox-img").src = currentLightboxImages[currentLightboxIndex];
+            document.querySelector(".lightbox-counter").textContent = `${currentLightboxIndex+1} / ${currentLightboxImages.length}`;
+        }
+    }
+    function nextImage() {
+        if (currentLightboxImages.length) {
+            currentLightboxIndex = (currentLightboxIndex + 1) % currentLightboxImages.length;
+            document.querySelector(".lightbox-img").src = currentLightboxImages[currentLightboxIndex];
+            document.querySelector(".lightbox-counter").textContent = `${currentLightboxIndex+1} / ${currentLightboxImages.length}`;
+        }
+    }
+
     function renderProducts() {
         const grid = document.getElementById("productsGrid");
         if (!products.length) { grid.innerHTML = '<div class="loading">Нет товаров. Добавьте их в админ-панели</div>'; return; }
@@ -277,7 +323,7 @@
             const avitoLink = p.avito_link || DEFAULT_AVITO;
             return `
                 <div class="product-card">
-                    <div class="product-img">
+                    <div class="product-img" data-images='${JSON.stringify(p.images || [])}'>
                         ${mainImg ? `<img src="${mainImg}" alt="${p.name}">` : '<div style="font-size:4rem;">🎨</div>'}
                     </div>
                     <div class="product-info">
@@ -292,6 +338,12 @@
         }).join('');
         
         document.querySelectorAll(".cart-btn").forEach(btn => btn.addEventListener("click", e => addToCart(parseInt(btn.dataset.id))));
+        document.querySelectorAll(".product-img").forEach(el => {
+            const images = JSON.parse(el.getAttribute("data-images") || "[]");
+            if (images.length) {
+                el.addEventListener("click", () => openLightbox(images, 0));
+            }
+        });
     }
 
     function renderAdminList() {
@@ -426,12 +478,12 @@
     }
 
     // ========== ФОТО ==========
-    document.getElementById("productImages")?.addEventListener("change", e => {
+    function handleFiles(files) {
         const pv = document.getElementById("imagePreviews");
         pv.innerHTML = "";
         currentImageFiles = [];
-        if (e.target.files.length > 5) { showToast("Можно загрузить не более 5 фото!"); e.target.value = ""; return; }
-        [...e.target.files].forEach(f => {
+        if (files.length > 5) { showToast("Можно загрузить не более 5 фото!"); return; }
+        [...files].forEach(f => {
             const r = new FileReader();
             r.onload = ev => {
                 const div = document.createElement("div");
@@ -442,6 +494,19 @@
             };
             r.readAsDataURL(f);
         });
+    }
+
+    const dropZone = document.getElementById("dropZone");
+    dropZone?.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+    dropZone?.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+    dropZone?.addEventListener("drop", e => {
+        e.preventDefault();
+        dropZone.classList.remove("drag-over");
+        const files = e.dataTransfer.files;
+        if (files.length) handleFiles(files);
+    });
+    document.getElementById("productImages")?.addEventListener("change", e => {
+        if (e.target.files.length) handleFiles(e.target.files);
     });
 
     // ========== АДМИН ПАРОЛЬ ==========
@@ -493,6 +558,17 @@
     document.getElementById("clearCartBtn")?.addEventListener("click", clearCart);
     document.getElementById("checkoutBtn")?.addEventListener("click", showOrderForm);
     document.getElementById("submitOrderBtn")?.addEventListener("click", submitOrder);
+    document.querySelector(".lightbox-close")?.addEventListener("click", closeLightbox);
+    document.querySelector(".lightbox-prev")?.addEventListener("click", prevImage);
+    document.querySelector(".lightbox-next")?.addEventListener("click", nextImage);
+    document.getElementById("lightbox")?.addEventListener("click", (e) => { if (e.target === document.getElementById("lightbox")) closeLightbox(); });
+    document.addEventListener("keydown", (e) => {
+        if (document.getElementById("lightbox").classList.contains("active")) {
+            if (e.key === "ArrowLeft") prevImage();
+            if (e.key === "ArrowRight") nextImage();
+            if (e.key === "Escape") closeLightbox();
+        }
+    });
 
     function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
     function showToast(m) { const t = document.getElementById("toastMsg"); t.innerText = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000); }
