@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Админ-панель | OUN ART</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/1998/1998628.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #fefaf5; color: #2c2418; padding: 40px 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .admin-panel { background: white; border-radius: 28px; padding: 24px; border: 2px solid #e7d9ce; display: none; }
+        .admin-panel.active { display: block; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+        .admin-title { font-size: 1.5rem; font-weight: 700; color: #9c6e42; }
+        .admin-form { display: flex; flex-direction: column; gap: 16px; background: #f9f5ef; padding: 20px; border-radius: 20px; }
+        .admin-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+        .admin-form input, .admin-form textarea { padding: 12px; border: 1px solid #e2cfbf; border-radius: 16px; width: 100%; }
+        .admin-form textarea { min-height: 80px; }
+        .image-cells { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 16px; }
+        .image-cell { aspect-ratio: 1 / 1; border: 2px solid #e2cfbf; border-radius: 16px; background: #f9f5ef; position: relative; overflow: hidden; cursor: pointer; }
+        .image-cell.drag-over { border-color: #c26e3c; background: #e8f0fe; }
+        .image-cell img { width: 100%; height: 100%; object-fit: cover; }
+        .image-cell .cell-number { position: absolute; top: 4px; left: 6px; background: rgba(0,0,0,0.5); color: white; font-size: 10px; padding: 2px 6px; border-radius: 20px; z-index: 5; }
+        .image-cell .remove-photo { position: absolute; top: 2px; right: 2px; background: #c26e3c; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 10px; z-index: 10; }
+        .empty-cell { display: flex; align-items: center; justify-content: center; height: 100%; color: #b29272; font-size: 24px; }
+        .admin-buttons-row { display: flex; gap: 12px; margin-top: 16px; }
+        .admin-buttons-row button { flex: 1; background: #9c6e42; color: white; border: none; padding: 14px; border-radius: 40px; font-weight: bold; cursor: pointer; }
+        .admin-buttons-row button.secondary { background: #e7dbcf; color: #4f3a28; }
+        .products-admin-list { max-height: 400px; overflow-y: auto; margin-top: 20px; }
+        .admin-product-item { background: #fefaf5; padding: 12px; border-radius: 16px; border: 1px solid #eedbcb; margin-bottom: 8px; }
+        .admin-product-header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+        .admin-product-title { font-weight: 700; }
+        .admin-product-price { color: #9c6e42; }
+        .admin-product-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .edit-btn, .delete-btn { padding: 4px 12px; border: none; border-radius: 20px; cursor: pointer; background: #e7dbcf; }
+        .delete-btn { background: #f0cfc3; }
+        .edit-fields { display: none; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eedbcb; }
+        .edit-fields input, .edit-fields textarea { padding: 8px; border-radius: 12px; border: 1px solid #e2cfbf; }
+        .top-checkbox { margin-left: 16px; transform: scale(1.2); vertical-align: middle; }
+
+        .password-modal { display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
+        .password-modal.active { display: flex; }
+        .password-content { background: white; border-radius: 32px; padding: 32px; max-width: 400px; width: 90%; text-align: center; }
+        .password-content input { width: 100%; padding: 12px; border-radius: 16px; border: 1px solid #e2cfbf; margin: 16px 0; }
+        .password-content button { background: #9c6e42; color: white; border: none; padding: 12px; border-radius: 40px; width: 100%; cursor: pointer; }
+        .password-error { color: red; margin-top: 8px; display: none; }
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #2c2418; color: white; padding: 10px 20px; border-radius: 60px; z-index: 1100; opacity: 0; transition: 0.2s; }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div id="passwordModal" class="password-modal">
+        <div class="password-content">
+            <h3>🔐 Вход в админ-панель</h3>
+            <input type="password" id="adminPassword" placeholder="Пароль">
+            <button id="submitPasswordBtn">Войти</button>
+            <div id="passwordError" class="password-error">Неверный пароль</div>
+        </div>
+    </div>
+
+    <div id="adminPanel" class="admin-panel">
+        <div class="admin-header">
+            <h2 class="admin-title"><i class="fas fa-cog"></i> Управление товарами</h2>
+            <button id="logoutAdminBtn" style="background:#e7dbcf; border:none; padding:6px 12px; border-radius:30px;">Выйти</button>
+        </div>
+        <div class="admin-form">
+            <div class="admin-form-row">
+                <input type="text" id="productName" placeholder="Название товара">
+                <input type="text" id="productPrice" placeholder="Цена (только цифры)">
+                <input type="url" id="productAvitoLink" placeholder="Ссылка на Авито">
+            </div>
+            <textarea id="productDesc" placeholder="Описание товара"></textarea>
+            <div class="image-upload-area" id="dropZone" style="border:2px dashed #e2cfbf; border-radius:20px; padding:20px; text-align:center; background:#fffaf5; margin-bottom:16px;">
+                <i class="fas fa-images"></i> Перетащите фото в ячейки или нажмите для выбора (до 10 шт)
+                <input type="file" id="productImages" accept="image/*" multiple style="display:none">
+                <label for="productImages" class="image-upload-label" style="display:inline-block; background:#9c6e42; color:white; padding:10px 20px; border-radius:40px; cursor:pointer; margin:8px 0;">Выбрать фото</label>
+            </div>
+            <div id="imageCells" class="image-cells"></div>
+            <div class="admin-buttons-row">
+                <button id="addProductBtn">➕ Добавить товар</button>
+                <button id="exportProductsBtn" class="secondary">📥 Экспортировать товары</button>
+                <button id="resetFormBtn" class="secondary">🗑️ Сбросить</button>
+            </div>
+        </div>
+        <div class="products-admin-list" id="adminProductsList"></div>
+    </div>
+</div>
+<div id="toastMsg" class="toast"></div>
+
+<script>
+    const ADMIN_PASSWORD = "classmate@$^";
+    let products = [];
+    let currentImageFiles = new Array(10).fill(null);
+
+    function initImageCells() {
+        const container = document.getElementById("imageCells");
+        container.innerHTML = '';
+        for (let i = 1; i <= 10; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'image-cell';
+            cell.dataset.index = i - 1;
+            cell.innerHTML = `<div class="cell-number">${i}</div><div class="empty-cell">📷</div>`;
+            cell.addEventListener('dragover', (e) => { e.preventDefault(); cell.classList.add('drag-over'); });
+            cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+            cell.addEventListener('drop', (e) => {
+                e.preventDefault();
+                cell.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    const file = files[0];
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        currentImageFiles[parseInt(cell.dataset.index)] = ev.target.result;
+                        updateImageCells();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            container.appendChild(cell);
+        }
+        updateImageCells();
+    }
+
+    function updateImageCells() {
+        const cells = document.querySelectorAll('.image-cell');
+        cells.forEach((cell, idx) => {
+            const imgData = currentImageFiles[idx];
+            if (imgData) {
+                cell.innerHTML = `<div class="cell-number">${idx + 1}</div><img src="${imgData}"><div class="remove-photo" data-index="${idx}">×</div>`;
+            } else {
+                cell.innerHTML = `<div class="cell-number">${idx + 1}</div><div class="empty-cell">📷</div>`;
+            }
+        });
+        document.querySelectorAll('.remove-photo').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.index);
+                currentImageFiles[idx] = null;
+                updateImageCells();
+            });
+        });
+    }
+
+    function handleFiles(files) {
+        let cellIndex = 0;
+        for (let i = 0; i < files.length && cellIndex < 10; i++) {
+            if (currentImageFiles[cellIndex] === null) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    currentImageFiles[cellIndex] = ev.target.result;
+                    updateImageCells();
+                };
+                reader.readAsDataURL(files[i]);
+                cellIndex++;
+            } else {
+                while (cellIndex < 10 && currentImageFiles[cellIndex] !== null) cellIndex++;
+                if (cellIndex < 10) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        currentImageFiles[cellIndex] = ev.target.result;
+                        updateImageCells();
+                    };
+                    reader.readAsDataURL(files[i]);
+                    cellIndex++;
+                }
+            }
+        }
+    }
+
+    function clearImagePreviews() {
+        currentImageFiles = new Array(10).fill(null);
+        updateImageCells();
+        document.getElementById("productImages").value = "";
+    }
+
+    async function loadProducts() {
+        try {
+            const response = await fetch('products.json');
+            if (!response.ok) throw new Error();
+            products = await response.json();
+        } catch(e) {
+            products = [];
+        }
+        renderAdminList();
+    }
+
+    function exportProducts() {
+        const json = JSON.stringify(products, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "products.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("✅ Файл products.json скачан! Загрузите его на GitHub.");
+    }
+
+    function addProduct() {
+        const name = document.getElementById("productName").value.trim();
+        const desc = document.getElementById("productDesc").value.trim();
+        const price = document.getElementById("productPrice").value.trim() || "0";
+        const avito = document.getElementById("productAvitoLink").value.trim();
+        if (!name || !desc) { showToast("Заполните название и описание"); return; }
+        
+        const images = currentImageFiles.filter(img => img !== null);
+        const newId = products.length ? Math.max(...products.map(p => p.id)) + 1 : 1;
+        products.push({
+            id: newId,
+            name: name,
+            description: desc,
+            price: price,
+            avito_link: avito,
+            images: images,
+            top: false
+        });
+        
+        document.getElementById("productName").value = "";
+        document.getElementById("productDesc").value = "";
+        document.getElementById("productPrice").value = "";
+        document.getElementById("productAvitoLink").value = "";
+        clearImagePreviews();
+        renderAdminList();
+        showToast("✅ Товар добавлен. Нажмите «Экспортировать товары»");
+    }
+
+    function deleteProduct(id) {
+        if (!confirm("Удалить товар?")) return;
+        products = products.filter(p => p.id !== id);
+        renderAdminList();
+        showToast("✅ Товар удален");
+    }
+
+    function updateProduct(id, name, desc, price, avito, top) {
+        const index = products.findIndex(p => p.id === id);
+        if (index === -1) return;
+        products[index] = { ...products[index], name, description: desc, price, avito_link: avito, top };
+        renderAdminList();
+        showToast("✅ Товар обновлен");
+    }
+
+    function renderAdminList() {
+        const container = document.getElementById("adminProductsList");
+        if (!products.length) { container.innerHTML = "<div>Нет товаров</div>"; return; }
+        container.innerHTML = products.map(p => `
+            <div class="admin-product-item" data-id="${p.id}">
+                <div class="admin-product-header">
+                    <span class="admin-product-title">${escapeHtml(p.name)}</span>
+                    <span class="admin-product-price">${p.price} ₽</span>
+                    <label style="font-size:0.8rem;"><input type="checkbox" class="top-checkbox" data-id="${p.id}" ${p.top ? 'checked' : ''}> ТОП</label>
+                </div>
+                <div class="admin-product-actions">
+                    <button class="edit-btn" data-id="${p.id}">✏️ Ред.</button>
+                    <button class="delete-btn" data-id="${p.id}">🗑️ Удалить</button>
+                </div>
+                <div class="edit-fields" id="edit-fields-${p.id}" style="display:none;">
+                    <input type="text" id="edit-name-${p.id}" value="${escapeHtml(p.name)}" placeholder="Название">
+                    <textarea id="edit-desc-${p.id}" placeholder="Описание">${escapeHtml(p.description || '')}</textarea>
+                    <input type="text" id="edit-price-${p.id}" value="${p.price}" placeholder="Цена">
+                    <input type="url" id="edit-avito-${p.id}" value="${p.avito_link || ''}" placeholder="Ссылка на Авито">
+                    <div><button class="save-edit-btn" data-id="${p.id}">💾 Сохранить</button> <button class="cancel-edit-btn" data-id="${p.id}">Отмена</button></div>
+                </div>
+            </div>
+        `).join('');
+        
+        document.querySelectorAll(".delete-btn").forEach(btn => btn.addEventListener("click", e => deleteProduct(parseInt(btn.dataset.id))));
+        document.querySelectorAll(".edit-btn").forEach(btn => btn.addEventListener("click", e => {
+            const id = parseInt(btn.dataset.id);
+            const fields = document.getElementById(`edit-fields-${id}`);
+            fields.style.display = fields.style.display === "none" ? "flex" : "none";
+        }));
+        document.querySelectorAll(".save-edit-btn").forEach(btn => btn.addEventListener("click", e => {
+            const id = parseInt(btn.dataset.id);
+            const name = document.getElementById(`edit-name-${id}`).value;
+            const desc = document.getElementById(`edit-desc-${id}`).value;
+            const price = document.getElementById(`edit-price-${id}`).value;
+            const avito = document.getElementById(`edit-avito-${id}`).value;
+            const topCheckbox = document.querySelector(`.top-checkbox[data-id="${id}"]`);
+            const top = topCheckbox ? topCheckbox.checked : false;
+            updateProduct(id, name, desc, price, avito, top);
+            document.getElementById(`edit-fields-${id}`).style.display = "none";
+        }));
+        document.querySelectorAll(".cancel-edit-btn").forEach(btn => btn.addEventListener("click", e => {
+            const id = parseInt(btn.dataset.id);
+            document.getElementById(`edit-fields-${id}`).style.display = "none";
+        }));
+        document.querySelectorAll(".top-checkbox").forEach(cb => {
+            cb.addEventListener("change", (e) => {
+                const id = parseInt(cb.dataset.id);
+                const product = products.find(p => p.id === id);
+                if (product) {
+                    product.top = cb.checked;
+                    renderAdminList();
+                    showToast("ТОП обновлен");
+                }
+            });
+        });
+    }
+
+    function showPasswordModal() { document.getElementById("passwordModal").classList.add("active"); }
+    function loginAdmin(pw) {
+        if (pw === ADMIN_PASSWORD) {
+            sessionStorage.setItem("admin_logged", "true");
+            document.getElementById("passwordModal").style.display = "none";
+            document.getElementById("adminPanel").classList.add("active");
+            loadProducts();
+            showToast("Добро пожаловать!");
+        } else {
+            document.getElementById("passwordError").style.display = "block";
+        }
+    }
+    function logoutAdmin() {
+        sessionStorage.removeItem("admin_logged");
+        document.getElementById("adminPanel").classList.remove("active");
+        document.getElementById("passwordModal").style.display = "flex";
+        showToast("Вы вышли");
+    }
+
+    document.getElementById("productImages")?.addEventListener("change", e => { if (e.target.files.length) handleFiles(e.target.files); });
+    const dropZone = document.getElementById("dropZone");
+    dropZone?.addEventListener("dragover", e => e.preventDefault());
+    dropZone?.addEventListener("drop", e => { e.preventDefault(); const files = e.dataTransfer.files; if (files.length) handleFiles(files); });
+    document.getElementById("addProductBtn")?.addEventListener("click", addProduct);
+    document.getElementById("exportProductsBtn")?.addEventListener("click", exportProducts);
+    document.getElementById("resetFormBtn")?.addEventListener("click", clearImagePreviews);
+    document.getElementById("submitPasswordBtn")?.addEventListener("click", () => loginAdmin(document.getElementById("adminPassword").value));
+    document.getElementById("adminPassword")?.addEventListener("keypress", e => { if (e.key === "Enter") loginAdmin(e.target.value); });
+    document.getElementById("logoutAdminBtn")?.addEventListener("click", logoutAdmin);
+
+    function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
+    function showToast(m) { const t = document.getElementById("toastMsg"); t.innerText = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000); }
+
+    if (sessionStorage.getItem("admin_logged") === "true") {
+        document.getElementById("passwordModal").style.display = "none";
+        document.getElementById("adminPanel").classList.add("active");
+        loadProducts();
+    }
+    initImageCells();
+</script>
+</body>
+</html>
