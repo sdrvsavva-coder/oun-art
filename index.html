@@ -51,13 +51,14 @@
         .product-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
         .product-modal.active { display: flex; }
         .modal-content { background: white; max-width: 600px; width: 90%; border-radius: 32px; padding: 24px; max-height: 85vh; overflow-y: auto; position: relative; }
-        .modal-close { position: absolute; top: 16px; right: 20px; font-size: 28px; cursor: pointer; background: none; border: none; }
-        .modal-img-container { position: relative; text-align: center; }
+        .modal-close { position: absolute; top: 12px; right: 16px; font-size: 28px; cursor: pointer; background: #9c6e42; color: white; border: none; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10; transition: 0.2s; }
+        .modal-close:hover { background: #7e5735; transform: scale(1.05); }
+        .modal-img-container { position: relative; text-align: center; margin-top: 8px; }
         .modal-img { width: 100%; max-height: 300px; object-fit: contain; border-radius: 20px; background: #f9f2ea; }
-        .modal-prev, .modal-next { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.5); color: white; border: none; font-size: 24px; cursor: pointer; padding: 8px 12px; border-radius: 50%; }
+        .modal-prev, .modal-next { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; font-size: 24px; cursor: pointer; padding: 8px 12px; border-radius: 50%; transition: 0.2s; }
+        .modal-prev:hover, .modal-next:hover { background: rgba(0,0,0,0.8); }
         .modal-prev { left: 10px; }
         .modal-next { right: 10px; }
-        .modal-prev:hover, .modal-next:hover { background: rgba(0,0,0,0.8); }
         .modal-counter { text-align: center; margin: 8px 0; font-size: 0.8rem; color: #6b5a48; }
         .modal-title { font-size: 1.8rem; font-weight: 700; margin-bottom: 12px; }
         .modal-price { font-size: 1.6rem; color: #9c6e42; font-weight: 800; margin-bottom: 16px; }
