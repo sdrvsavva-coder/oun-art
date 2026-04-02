@@ -38,12 +38,22 @@
         .product-price { font-weight: 800; font-size: 1.3rem; color: #9c6e42; }
 
         .top-section { padding: 40px 0; background: #fff8f0; }
-        .top-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .top-grid { display: grid; gap: 12px; }
+        .top-grid-1 { grid-template-columns: 1fr; }
+        .top-grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .top-grid-3 { grid-template-columns: 2fr 1fr; }
+        .top-grid-3-small { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .top-grid-4 { grid-template-columns: repeat(2, 1fr); }
+        .top-grid-5, .top-grid-6, .top-grid-7, .top-grid-8, .top-grid-9, .top-grid-10 { grid-template-columns: repeat(3, 1fr); }
         .top-item { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; }
         .top-item:hover { transform: translateY(-4px); }
-        .top-img { height: 180px; background: #f9f2ea; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .top-img img { width: 100%; height: 100%; object-fit: cover; }
+        .top-img { background: #f9f2ea; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .top-img img { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
+        .top-item:hover .top-img img { transform: scale(1.02); }
         .top-title { padding: 10px; text-align: center; font-weight: 600; background: white; font-size: 0.9rem; }
+        .full-width { grid-column: 1 / -1; }
+        .height-large { min-height: 300px; }
+        .height-medium { min-height: 200px; }
 
         .product-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
         .product-modal.active { display: flex; }
@@ -99,7 +109,7 @@
         .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #2c2418; color: white; padding: 10px 20px; border-radius: 60px; z-index: 1100; opacity: 0; transition: 0.2s; }
         .toast.show { opacity: 1; }
         footer { text-align: center; padding: 30px 0; border-top: 1px solid #e7dbcf; color: #8e7a64; margin-top: 20px; }
-        @media (max-width: 768px) { .hero h1 { font-size: 3rem; } .hero p { font-size: 1.2rem; } .top-grid { grid-template-columns: repeat(2, 2fr); } .image-cells { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .hero h1 { font-size: 3rem; } .hero p { font-size: 1.2rem; } .image-cells { grid-template-columns: repeat(2, 1fr); } .top-grid-3 { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -129,7 +139,7 @@
 <div class="top-section" id="topSection">
     <div class="container">
         <h2 class="section-title">🔥 ТОП ПРОДАЖ</h2>
-        <div class="top-grid" id="topGrid"></div>
+        <div id="topGrid" class="top-grid"></div>
     </div>
 </div>
 
@@ -407,20 +417,47 @@
         const container = document.getElementById("topGrid");
         if (!topProduct) { container.innerHTML = '<div class="loading">Нет товара в топе. Отметьте галочку «ТОП» в админ-панели</div>'; return; }
         
-        const topImages = (topProduct.images || []).slice(0, 4);
-        const imagesToShow = topImages.length ? topImages : [];
+        const topImages = (topProduct.images || []).slice(0, 10);
+        const count = topImages.length;
+        if (count === 0) { container.innerHTML = '<div class="loading">У товара нет фото</div>'; return; }
         
-        if (imagesToShow.length === 0) {
-            container.innerHTML = '<div class="loading">У товара нет фото</div>';
-            return;
+        let gridClass = '';
+        if (count === 1) gridClass = 'top-grid-1';
+        else if (count === 2) gridClass = 'top-grid-2';
+        else if (count === 3) gridClass = 'top-grid-3';
+        else if (count === 4) gridClass = 'top-grid-4';
+        else gridClass = 'top-grid-5';
+        
+        container.className = `top-grid ${gridClass}`;
+        
+        let html = '';
+        if (count === 3) {
+            html = `
+                <div class="top-item full-width" data-id="${topProduct.id}">
+                    <div class="top-img height-large"><img src="${topImages[0]}" alt="${topProduct.name}"></div>
+                    <div class="top-title">${escapeHtml(topProduct.name)}</div>
+                </div>
+                <div class="top-grid-3-small">
+                    <div class="top-item" data-id="${topProduct.id}">
+                        <div class="top-img height-medium"><img src="${topImages[1]}" alt="${topProduct.name}"></div>
+                        <div class="top-title">${escapeHtml(topProduct.name)}</div>
+                    </div>
+                    <div class="top-item" data-id="${topProduct.id}">
+                        <div class="top-img height-medium"><img src="${topImages[2]}" alt="${topProduct.name}"></div>
+                        <div class="top-title">${escapeHtml(topProduct.name)}</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            html = topImages.map(img => `
+                <div class="top-item" data-id="${topProduct.id}">
+                    <div class="top-img"><img src="${img}" alt="${topProduct.name}"></div>
+                    <div class="top-title">${escapeHtml(topProduct.name)}</div>
+                </div>
+            `).join('');
         }
         
-        container.innerHTML = imagesToShow.map(img => `
-            <div class="top-item" data-id="${topProduct.id}">
-                <div class="top-img"><img src="${img}" alt="${topProduct.name}"></div>
-                <div class="top-title">${escapeHtml(topProduct.name)}</div>
-            </div>
-        `).join('');
+        container.innerHTML = html;
         
         document.querySelectorAll(".top-item").forEach(item => {
             item.addEventListener("click", () => {
