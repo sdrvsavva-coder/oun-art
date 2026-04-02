@@ -24,27 +24,26 @@
         .hero { text-align: center; padding: 60px 0 40px; }
         .hero h1 { font-size: 5rem; font-weight: 700; color: #9c6e42; letter-spacing: 2px; margin-bottom: 12px; }
         .hero p { font-size: 1.8rem; color: #b29272; font-weight: 400; }
-        .hero .btn-catalog { background: #9c6e42; color: white; border: none; padding: 14px 48px; border-radius: 60px; font-size: 1.2rem; font-weight: 600; margin-top: 32px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .hero .btn-catalog:hover { background: #7e5735; transform: translateY(-2px); }
+        .hero .btn-catalog { background: #9c6e42; color: white; border: none; padding: 14px 48px; border-radius: 60px; font-size: 1.2rem; font-weight: 600; margin-top: 32px; cursor: pointer; transition: 0.2s; }
 
         .catalog-section { padding: 40px 0; background: #fefaf5; }
         .section-title { font-size: 2rem; font-weight: 600; margin-bottom: 32px; border-left: 6px solid #c6a27a; padding-left: 20px; }
         .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 30px; }
         .product-card { background: white; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.05); border: 1px solid #f0e2d4; transition: 0.25s; cursor: pointer; }
-        .product-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.1); }
+        .product-card:hover { transform: translateY(-5px); }
         .product-img { background: #f9f2ea; height: 220px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .product-img img { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
+        .product-img img { width: 100%; height: 100%; object-fit: cover; }
         .product-info { padding: 16px; }
         .product-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 6px; }
         .product-price { font-weight: 800; font-size: 1.3rem; color: #9c6e42; }
 
         .top-section { padding: 40px 0; background: #fff8f0; }
-        .top-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
-        .top-item { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 6px 16px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; }
+        .top-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .top-item { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; }
         .top-item:hover { transform: translateY(-4px); }
         .top-img { height: 180px; background: #f9f2ea; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .top-img img { width: 100%; height: 100%; object-fit: cover; }
-        .top-title { padding: 12px; text-align: center; font-weight: 600; background: white; }
+        .top-title { padding: 10px; text-align: center; font-weight: 600; background: white; font-size: 0.9rem; }
 
         .product-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
         .product-modal.active { display: flex; }
@@ -100,7 +99,7 @@
         .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #2c2418; color: white; padding: 10px 20px; border-radius: 60px; z-index: 1100; opacity: 0; transition: 0.2s; }
         .toast.show { opacity: 1; }
         footer { text-align: center; padding: 30px 0; border-top: 1px solid #e7dbcf; color: #8e7a64; margin-top: 20px; }
-        @media (max-width: 768px) { .hero h1 { font-size: 3rem; } .hero p { font-size: 1.2rem; } .top-grid { grid-template-columns: repeat(2, 1fr); } .image-cells { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .hero h1 { font-size: 3rem; } .hero p { font-size: 1.2rem; } .top-grid { grid-template-columns: repeat(2, 2fr); } .image-cells { grid-template-columns: repeat(2, 1fr); } }
     </style>
 </head>
 <body>
@@ -232,7 +231,6 @@
             cell.dataset.index = i - 1;
             cell.innerHTML = `<div class="cell-number">${i}</div><div class="empty-cell">📷</div>`;
             
-            // Drag & Drop для каждой ячейки
             cell.addEventListener('dragover', (e) => { e.preventDefault(); cell.classList.add('drag-over'); });
             cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
             cell.addEventListener('drop', (e) => {
@@ -275,7 +273,6 @@
     }
 
     function handleFiles(files) {
-        // Заполняем ячейки по порядку
         let cellIndex = 0;
         for (let i = 0; i < files.length && cellIndex < 10; i++) {
             if (currentImageFiles[cellIndex] === null) {
@@ -287,7 +284,6 @@
                 reader.readAsDataURL(files[i]);
                 cellIndex++;
             } else {
-                // ищем следующую пустую ячейку
                 while (cellIndex < 10 && currentImageFiles[cellIndex] !== null) cellIndex++;
                 if (cellIndex < 10) {
                     const reader = new FileReader();
@@ -407,18 +403,25 @@
     }
 
     function renderTopProducts() {
-        const topProducts = products.filter(p => p.top === true).slice(0, 4);
+        const topProduct = products.find(p => p.top === true);
         const container = document.getElementById("topGrid");
-        if (!topProducts.length) { container.innerHTML = '<div class="loading">Нет товаров в топе</div>'; return; }
-        container.innerHTML = topProducts.map(p => {
-            const mainImg = p.images?.[0] || null;
-            return `
-                <div class="top-item" data-id="${p.id}">
-                    <div class="top-img">${mainImg ? `<img src="${mainImg}" alt="${p.name}">` : '<div style="font-size:3rem;">🎨</div>'}</div>
-                    <div class="top-title">${escapeHtml(p.name)}</div>
-                </div>
-            `;
-        }).join('');
+        if (!topProduct) { container.innerHTML = '<div class="loading">Нет товара в топе. Отметьте галочку «ТОП» в админ-панели</div>'; return; }
+        
+        const topImages = (topProduct.images || []).slice(0, 4);
+        const imagesToShow = topImages.length ? topImages : [];
+        
+        if (imagesToShow.length === 0) {
+            container.innerHTML = '<div class="loading">У товара нет фото</div>';
+            return;
+        }
+        
+        container.innerHTML = imagesToShow.map(img => `
+            <div class="top-item" data-id="${topProduct.id}">
+                <div class="top-img"><img src="${img}" alt="${topProduct.name}"></div>
+                <div class="top-title">${escapeHtml(topProduct.name)}</div>
+            </div>
+        `).join('');
+        
         document.querySelectorAll(".top-item").forEach(item => {
             item.addEventListener("click", () => {
                 const id = parseInt(item.dataset.id);
@@ -490,7 +493,12 @@
                 const id = parseInt(cb.dataset.id);
                 const product = products.find(p => p.id === id);
                 if (product) {
-                    product.top = cb.checked;
+                    if (cb.checked) {
+                        products.forEach(p => { if (p.id !== id) p.top = false; });
+                        product.top = true;
+                    } else {
+                        product.top = false;
+                    }
                     renderAdminList();
                     renderTopProducts();
                     showToast("ТОП обновлен");
