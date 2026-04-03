@@ -1,7 +1,0 @@
-{
-    "name": "oun-art-api",
-    "version": "1.0.0",
-    "description": "API for updating products",
-    "main": "api/update.js",
-    "type": "module"
-}
