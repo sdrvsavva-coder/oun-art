@@ -62,12 +62,20 @@
         .modal-price { font-size: 1.6rem; color: #9c6e42; font-weight: 800; margin-bottom: 16px; }
         .modal-desc { color: #5a4a38; margin-bottom: 24px; line-height: 1.5; }
         .modal-avito { background: #00A550; color: white; text-align: center; display: inline-block; padding: 12px 24px; border-radius: 40px; text-decoration: none; font-weight: 600; width: 100%; }
-        .modal-cart { background: #f0e3d8; border: none; width: 100%; padding: 12px; border-radius: 40px; font-weight: 600; margin-bottom: 12px; cursor: pointer; }
+        .modal-cart { background: #f0e3d8; border: none; width: 100%; padding: 12px; border-radius: 40px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+        .modal-cart .cart-controls { display: flex; align-items: center; gap: 12px; }
+        .modal-cart .cart-controls button { background: #c26e3c; color: white; border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 14px; }
+        .modal-cart .cart-controls span { font-weight: 600; min-width: 20px; text-align: center; }
 
         .cart-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
         .cart-modal.active { display: flex; }
         .cart-content { background: white; max-width: 500px; width: 90%; border-radius: 28px; padding: 20px; max-height: 80vh; overflow-y: auto; }
-        .cart-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eedbcb; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eedbcb; gap: 12px; flex-wrap: wrap; }
+        .cart-item-info { flex: 2; }
+        .cart-item-controls { display: flex; align-items: center; gap: 12px; }
+        .cart-item-controls button { background: #e7dbcf; border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-weight: bold; font-size: 16px; }
+        .cart-item-controls .cart-remove { background: #f0cfc3; color: #a5512c; width: auto; padding: 4px 12px; border-radius: 20px; }
+        .cart-item-controls span { font-weight: 600; min-width: 24px; text-align: center; }
         .btn-clear { background: #e7dbcf; border: none; padding: 10px; border-radius: 40px; width: 100%; margin-top: 12px; cursor: pointer; }
         .order-form { margin-top: 20px; padding-top: 20px; border-top: 2px solid #eedbcb; }
         .order-form input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #e2cfbf; border-radius: 12px; }
@@ -113,7 +121,6 @@
     <div class="container">
         <h2 class="section-title">✨ Наши изделия из гипса</h2>
         <div id="productsGrid" class="products-grid"><div class="loading">Загрузка товаров...</div></div>
-        <div class="custom-note" style="margin-top: 30px; display: block; text-align: center;">🖌️ Индивидуальная роспись — обсудим детали в Telegram</div>
     </div>
 </div>
 
@@ -131,7 +138,7 @@
         <div id="modalTitle" class="modal-title"></div>
         <div id="modalPrice" class="modal-price"></div>
         <div id="modalDesc" class="modal-desc"></div>
-        <button id="modalCartBtn" class="modal-cart"><i class="fas fa-cart-plus"></i> В корзину</button>
+        <button id="modalCartBtn" class="modal-cart"></button>
         <a id="modalAvitoLink" href="#" target="_blank" class="modal-avito"><i class="fas fa-store"></i> Купить на Авито</a>
     </div>
 </div>
@@ -175,11 +182,12 @@
         }
         renderProducts();
         renderTopProducts();
+        updateModalCartButton();
     }
 
     function renderProducts() {
         const grid = document.getElementById("productsGrid");
-        if (!products.length) { grid.innerHTML = '<div class="loading">Нет товаров. Добавьте их в админ-панели</div>'; return; }
+        if (!products.length) { grid.innerHTML = '<div class="loading">Нет товаров</div>'; return; }
         grid.innerHTML = products.map(p => {
             const mainImg = p.images?.[0] || null;
             return `
@@ -211,7 +219,61 @@
         document.getElementById("modalDesc").innerText = product.description || '';
         const avitoLink = product.avito_link || DEFAULT_AVITO;
         document.getElementById("modalAvitoLink").href = avitoLink;
+        updateModalCartButton();
         modal.classList.add("active");
+    }
+
+    function updateModalCartButton() {
+        const btn = document.getElementById("modalCartBtn");
+        if (!currentModalProduct) return;
+        const cartItem = cart.find(i => i.id === currentModalProduct.id);
+        const qty = cartItem ? cartItem.qty : 0;
+        
+        if (qty > 0) {
+            btn.innerHTML = `<span>🛒 В корзине</span><div class="cart-controls"><button class="modal-decr">-</button><span>${qty}</span><button class="modal-incr">+</button></div>`;
+            btn.querySelector('.modal-decr')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                updateCartQuantity(currentModalProduct.id, -1);
+                updateModalCartButton();
+                renderCart();
+            });
+            btn.querySelector('.modal-incr')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                updateCartQuantity(currentModalProduct.id, 1);
+                updateModalCartButton();
+                renderCart();
+            });
+        } else {
+            btn.innerHTML = `<span>🛒 В корзину</span>`;
+            btn.onclick = () => {
+                addToCart(currentModalProduct);
+                updateModalCartButton();
+                renderCart();
+            };
+        }
+    }
+
+    function updateCartQuantity(id, delta) {
+        const existing = cart.find(i => i.id === id);
+        if (existing) {
+            const newQty = existing.qty + delta;
+            if (newQty <= 0) {
+                cart = cart.filter(i => i.id !== id);
+            } else {
+                existing.qty = newQty;
+            }
+        } else if (delta > 0) {
+            const product = products.find(p => p.id === id);
+            if (product) cart.push({ id, name: product.name, price: product.price, qty: 1 });
+        }
+        saveCart();
+        renderCart();
+        updateModalCartButton();
+        showToast("Корзина обновлена");
+    }
+
+    function addToCart(product) {
+        updateCartQuantity(product.id, 1);
     }
 
     function updateModalImage() {
@@ -249,10 +311,7 @@
     function renderTopProducts() {
         const topProducts = products.filter(p => p.top === true).slice(0, 3);
         const container = document.getElementById("topGrid");
-        const count = topProducts.length;
-        
-        if (count === 0) { container.innerHTML = '<div class="loading">Нет товаров в топе</div>'; return; }
-        
+        if (!topProducts.length) { container.innerHTML = '<div class="loading">Нет товаров в топе</div>'; return; }
         container.innerHTML = topProducts.map(p => {
             const mainImg = p.images?.[0] || null;
             return `
@@ -262,7 +321,6 @@
                 </div>
             `;
         }).join('');
-        
         document.querySelectorAll(".top-item").forEach(item => {
             item.addEventListener("click", () => {
                 const id = parseInt(item.dataset.id);
@@ -272,34 +330,61 @@
         });
     }
 
-    function addToCart(product) {
-        const existing = cart.find(i => i.id === product.id);
-        existing ? existing.qty++ : cart.push({ id: product.id, name: product.name, price: product.price, qty: 1 });
-        saveCart();
-        renderCart();
-        showToast("🛒 В корзину добавлено");
-    }
-
     function saveCart() { localStorage.setItem("oun_cart", JSON.stringify(cart)); updateCartCounter(); renderCart(); }
     function updateCartCounter() { document.getElementById("cartCounter").innerText = cart.reduce((s,i) => s + i.qty, 0); }
+    
     function renderCart() {
         const container = document.getElementById("cartItemsContainer");
         if (!cart.length) { container.innerHTML = "Корзина пуста"; document.getElementById("orderForm").style.display = "none"; document.getElementById("checkoutBtn").style.display = "block"; return; }
-        container.innerHTML = cart.map(i => `<div class="cart-item"><span>${escapeHtml(i.name)} — ${i.price} ₽ x ${i.qty}</span><button class="cart-remove" data-id="${i.id}">🗑️</button></div>`).join('');
-        document.querySelectorAll(".cart-remove").forEach(btn => btn.addEventListener("click", e => {
-            cart = cart.filter(i => i.id !== parseInt(btn.dataset.id));
-            saveCart();
-            renderCart();
-        }));
+        container.innerHTML = cart.map(i => `
+            <div class="cart-item">
+                <div class="cart-item-info">
+                    <strong>${escapeHtml(i.name)}</strong><br>
+                    ${i.price} ₽
+                </div>
+                <div class="cart-item-controls">
+                    <button class="cart-qty-minus" data-id="${i.id}">-</button>
+                    <span>${i.qty}</span>
+                    <button class="cart-qty-plus" data-id="${i.id}">+</button>
+                    <button class="cart-remove" data-id="${i.id}">🗑️ Удалить</button>
+                </div>
+            </div>
+        `).join('');
+        
+        document.querySelectorAll(".cart-qty-plus").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                const id = parseInt(btn.dataset.id);
+                updateCartQuantity(id, 1);
+            });
+        });
+        document.querySelectorAll(".cart-qty-minus").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                const id = parseInt(btn.dataset.id);
+                updateCartQuantity(id, -1);
+            });
+        });
+        document.querySelectorAll(".cart-remove").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                const id = parseInt(btn.dataset.id);
+                cart = cart.filter(i => i.id !== id);
+                saveCart();
+                renderCart();
+                updateModalCartButton();
+                showToast("Товар удален из корзины");
+            });
+        });
+        
         document.getElementById("checkoutBtn").style.display = "block";
         document.getElementById("orderForm").style.display = "none";
     }
-    function clearCart() { cart = []; saveCart(); renderCart(); showToast("Корзина очищена"); }
+    
+    function clearCart() { cart = []; saveCart(); renderCart(); updateModalCartButton(); showToast("Корзина очищена"); }
     function showOrderForm() {
         if (!cart.length) { showToast("Корзина пуста"); return; }
         document.getElementById("checkoutBtn").style.display = "none";
         document.getElementById("orderForm").style.display = "block";
     }
+    
     async function submitOrder() {
         const name = document.getElementById("orderName").value.trim();
         const email = document.getElementById("orderEmail").value.trim();
@@ -322,6 +407,7 @@
                 document.getElementById("orderEmail").value = "";
                 document.getElementById("orderPhone").value = "";
                 document.getElementById("orderTelegram").value = "";
+                updateModalCartButton();
             } else showToast("❌ Ошибка отправки");
         } catch(e) { showToast("❌ Ошибка отправки"); }
     }
@@ -337,13 +423,12 @@
     document.getElementById("checkoutBtn")?.addEventListener("click", showOrderForm);
     document.getElementById("submitOrderBtn")?.addEventListener("click", submitOrder);
     document.querySelector(".modal-close")?.addEventListener("click", () => document.getElementById("productModal").classList.remove("active"));
-    document.getElementById("modalCartBtn")?.addEventListener("click", () => { if (currentModalProduct) addToCart(currentModalProduct); document.getElementById("productModal").classList.remove("active"); });
     document.getElementById("modalPrev")?.addEventListener("click", prevModalImage);
     document.getElementById("modalNext")?.addEventListener("click", nextModalImage);
     window.addEventListener("click", e => { if (e.target === document.getElementById("productModal")) document.getElementById("productModal").classList.remove("active"); });
     
     function escapeHtml(s) { if (!s) return ''; return s.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
-    function showToast(m) { const t = document.getElementById("toastMsg"); t.innerText = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 4000); }
+    function showToast(m) { const t = document.getElementById("toastMsg"); t.innerText = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000); }
 
     loadProducts();
     const savedCart = localStorage.getItem("oun_cart");
